@@ -65,6 +65,27 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
       final exam = await StudentApiService().getExamForTaking(widget.examId);
       if (exam == null) throw Exception('تعذر تحميل بيانات الامتحان');
 
+      // 1. فحص فوري للمحاولات المتبقية قبل بدء الامتحان
+      if (exam['isExhausted'] == true || (exam['remainingAttempts'] != null && (exam['remainingAttempts'] as num) <= 0)) {
+        final lastSub = exam['lastSubmission'] as Map?;
+        final score = num.tryParse(lastSub?['score']?.toString() ?? '0') ?? 0;
+        final total = num.tryParse(lastSub?['total']?.toString() ?? exam['totalScore']?.toString() ?? '100') ?? 100;
+        final passing = num.tryParse(exam['passingScore']?.toString() ?? '50') ?? 50;
+        final percentage = total > 0 ? ((score / total) * 100).round() : 0;
+        setState(() {
+          _isLoading = false;
+          _submissionResult = {
+            'score': score,
+            'total': total,
+            'percentage': percentage,
+            'passed': score >= passing,
+            'isExhausted': true,
+            'message': 'لقد استنفدت جميع المحاولات المسموحة لهذا الامتحان (${exam['maxAttempts'] ?? 1} محاولة)',
+          };
+        });
+        return;
+      }
+
       final qList = (exam['questions'] is List)
           ? List<Map<String, dynamic>>.from(exam['questions'])
           : <Map<String, dynamic>>[];
@@ -99,11 +120,20 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
         _startTimer();
       }
     } catch (e) {
+      String msg = 'تعذر فتح الامتحان، يرجى المحاولة لاحقاً أو مراجعة إدارة السنتر';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          msg = data['message'].toString();
+        }
+      } else if (e.toString().contains('انتهت')) {
+        msg = 'انتهت فترة إتاحة هذا الامتحان';
+      } else if (e.toString().contains('استنفدت')) {
+        msg = 'لقد استنفدت جميع محاولاتك لهذا الامتحان';
+      }
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().contains('انتهت')
-            ? 'انتهت فترة إتاحة هذا الامتحان'
-            : 'تعذر فتح الامتحان، يرجى المحاولة لاحقاً أو مراجعة إدارة السنتر';
+        _errorMessage = msg;
       });
     }
   }

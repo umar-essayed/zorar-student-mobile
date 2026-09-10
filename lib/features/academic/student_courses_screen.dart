@@ -355,6 +355,10 @@ class StudentCoursesScreen extends ConsumerWidget {
                                       builder: (_) => LessonPlayerScreen(
                                         lesson: Map<String, dynamic>.from(l),
                                         courseTitle: course['title']?.toString() ?? '',
+                                        chapterLessons: (lessons as List)
+                                            .whereType<Map>()
+                                            .map((m) => Map<String, dynamic>.from(m))
+                                            .toList(),
                                       ),
                                     ),
                                   );

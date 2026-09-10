@@ -11,6 +11,7 @@ import 'features/navigation/student_shell_screen.dart';
 import 'features/onboarding/student_onboarding_screen.dart';
 
 import 'core/services/push_notification_service.dart';
+import 'core/services/in_app_banner_service.dart';
 
 // Provider to check if student has seen onboarding
 final onboardingStateProvider = FutureProvider<bool>((ref) async {
@@ -41,6 +42,8 @@ class StudentAppRoot extends ConsumerWidget {
     final onboardingAsync = ref.watch(onboardingStateProvider);
 
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
+      scaffoldMessengerKey: appScaffoldMessengerKey,
       title: branding.centerName.isNotEmpty ? branding.centerName : 'EduZorar Student',
       debugShowCheckedModeBanner: false,
       theme: StudentTheme.buildTheme(branding),

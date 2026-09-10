@@ -426,10 +426,11 @@ class StudentDashboardScreen extends ConsumerWidget {
 
         final rankSummary = profile?['rankSummary'] as Map?;
         final points = profile?['points'] ?? 0;
-        final rankNum = rankSummary?['rank'];
-        final rankLabel = (isOffline || rankSummary == null || rankNum == null || rankNum == 0)
-            ? 'المركز 0 على الدفعة'
-            : (rankSummary['rankLabel']?.toString() ?? 'المركز 0 على الدفعة');
+        final rankNum = rankSummary?['rank'] ?? rankSummary?['centerYearRank'];
+        final int effectiveRank = (rankNum is num && rankNum > 0) ? rankNum.toInt() : 1;
+        final rankLabel = (isOffline || rankSummary == null)
+            ? 'المركز $effectiveRank على الدفعة'
+            : (rankSummary['rankLabel']?.toString() ?? 'المركز $effectiveRank على الدفعة 🏆');
 
         return Column(
           children: [

@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../network/student_api_service.dart';
+import 'in_app_banner_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -66,9 +67,16 @@ class PushNotificationService {
         _sendTokenToBackend(newToken);
       });
 
-      // 5. Handle foreground notifications
+      // 5. Handle foreground notifications with rich in-app top banner
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('Received foreground notification: ${message.notification?.title}');
+        final title = message.notification?.title ?? 'تنبيه جديد من السنتر 🔔';
+        final body = message.notification?.body ?? '';
+        InAppBannerService.show(
+          title: title,
+          body: body,
+          data: message.data,
+        );
       });
 
       // 6. Handle notification click
