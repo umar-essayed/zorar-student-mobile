@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/student_data_providers.dart';
+import '../../core/services/offline_cache_service.dart';
+import '../../core/services/schedule_alarm_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/utils/group_utils.dart';
 
@@ -235,7 +237,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                         Icon(LucideIcons.clock, size: 12, color: branding.primaryColor),
                                         const SizedBox(width: 4),
                                         Text(
-                                          endTime.isNotEmpty ? '$startTime - $endTime' : startTime,
+                                          endTime.isNotEmpty
+                                              ? '${OfflineCacheService.format12Hour(startTime)} - ${OfflineCacheService.format12Hour(endTime)}'
+                                              : OfflineCacheService.format12Hour(startTime),
                                           style: GoogleFonts.cairo(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,

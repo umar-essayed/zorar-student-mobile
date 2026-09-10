@@ -7,10 +7,13 @@ import '../../core/providers/student_auth_provider.dart';
 import '../../core/providers/student_data_providers.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
+import '../../core/providers/network_provider.dart';
 import '../../core/theme/student_theme.dart';
 import '../../core/utils/group_utils.dart';
+import '../academic/group_analytics_screen.dart';
 import '../id_card/student_id_card_screen.dart';
 import '../exams/student_exams_screen.dart';
+import '../notifications/student_notifications_screen.dart';
 import '../profile/student_profile_screen.dart';
 import '../schedule/student_schedule_screen.dart';
 
@@ -27,6 +30,7 @@ class StudentDashboardScreen extends ConsumerWidget {
     final examsAsync = ref.watch(liveStudentExamsProvider);
     final groups = ref.watch(liveStudentGroupsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOffline = ref.watch(isOfflineProvider);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
@@ -40,6 +44,31 @@ class StudentDashboardScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
+              if (isOffline)
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orangeAccent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orangeAccent.withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.wifiOff, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'أنت في وضع عدم الاتصال • يتم عرض البيانات المحفوظة محلياً ⚡',
+                            style: GoogleFonts.cairo(fontSize: 11.5, color: Colors.orange[900], fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // 1. Header (Student Profile & Center Logo)
               SliverToBoxAdapter(
                 child: Padding(
@@ -244,6 +273,48 @@ class StudentDashboardScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Consumer(
+            builder: (ctx, ref, _) {
+              final unread = ref.watch(unreadNotificationsCountProvider);
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      LucideIcons.bell,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      size: 20,
+                    ),
+                    tooltip: 'مركز الإشعارات والتنبيهات',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const StudentNotificationsScreen()),
+                      );
+                    },
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$unread',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               LucideIcons.settings,
@@ -352,38 +423,117 @@ class StudentDashboardScreen extends ConsumerWidget {
         final availableExams = examsAsync.value?.length ?? 0;
         final walletBalance = profile?['financialSummary']?['walletBalance'] ?? 0;
 
-        return Row(
+        final rankSummary = profile?['rankSummary'] as Map?;
+        final points = profile?['points'] ?? 0;
+        final rankLabel = rankSummary?['rankLabel']?.toString() ?? 'المركز 1 على الدفعة 🏆';
+
+        return Column(
           children: [
-            Expanded(
-              child: _buildStatItem(
-                label: 'مرات الحضور',
-                value: '$attendances',
-                unit: 'حصة',
-                icon: LucideIcons.calendarCheck,
-                color: const Color(0xFF10B981),
-                isDark: isDark,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    label: 'مرات الحضور',
+                    value: '$attendances',
+                    unit: 'حصة',
+                    icon: LucideIcons.calendarCheck,
+                    color: const Color(0xFF10B981),
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildStatItem(
+                    label: 'امتحانات متاحة',
+                    value: '$availableExams',
+                    unit: 'امتحان',
+                    icon: LucideIcons.fileQuestion,
+                    color: Colors.orangeAccent,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildStatItem(
+                    label: 'الرصيد / المستحق',
+                    value: '${walletBalance.abs()}',
+                    unit: 'ج.م',
+                    icon: LucideIcons.wallet,
+                    color: walletBalance < 0 ? Colors.redAccent : branding.primaryColor,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildStatItem(
-                label: 'امتحانات متاحة',
-                value: '$availableExams',
-                unit: 'امتحان',
-                icon: LucideIcons.fileQuestion,
-                color: Colors.orangeAccent,
-                isDark: isDark,
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.35),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.amber.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildStatItem(
-                label: 'الرصيد / المستحق',
-                value: '${walletBalance.abs()}',
-                unit: 'ج.م',
-                icon: LucideIcons.wallet,
-                color: walletBalance < 0 ? Colors.redAccent : branding.primaryColor,
-                isDark: isDark,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(LucideIcons.trophy, color: Colors.amber, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          rankLabel,
+                          style: GoogleFonts.cairo(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'ترتيبي على مستوى طلاب الدفعة بالسنتر',
+                          style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$points نقطة',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -602,7 +752,7 @@ class StudentDashboardScreen extends ConsumerWidget {
     }
 
     return SizedBox(
-      height: 110,
+      height: 122,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -611,66 +761,115 @@ class StudentDashboardScreen extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final item = groups[index];
+          final groupId = GroupUtils.getId(item);
           final name = GroupUtils.getName(item);
           final subject = GroupUtils.getSubject(item);
           final teacher = GroupUtils.getTeacher(item);
 
-          return Container(
-            width: 190,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: branding.primaryColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(LucideIcons.bookOpen, color: branding.primaryColor, size: 14),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        subject.isNotEmpty ? subject : 'مادة تعليمية',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: branding.primaryColor,
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: groupId.isNotEmpty
+                  ? () {
+                      SoundService.playTap();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GroupAnalyticsScreen(
+                            groupId: groupId,
+                            groupName: name,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      );
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: 200,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: branding.primaryColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(LucideIcons.bookOpen, color: branding.primaryColor, size: 14),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            subject.isNotEmpty ? subject : 'مادة تعليمية',
+                            style: GoogleFonts.cairo(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: branding.primaryColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      name,
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            teacher.isNotEmpty ? 'أستاذ: $teacher' : 'السنتر التعليمي',
+                            style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey[600]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.trophy, size: 11, color: Color(0xFFD97706)),
+                              const SizedBox(width: 3),
+                              Text(
+                                'تحليلاتي',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                Text(
-                  name,
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  teacher.isNotEmpty ? 'أستاذ: $teacher' : 'السنتر التعليمي',
-                  style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey[600]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
             ),
           );
         },

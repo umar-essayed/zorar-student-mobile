@@ -93,3 +93,26 @@ final liveStudentCardProvider = FutureProvider.autoDispose<Map<String, dynamic>?
 
   return await StudentApiService().getStudentCard(sId);
 });
+
+// 10. Live Student Notifications Provider
+final liveStudentNotificationsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final auth = ref.watch(studentAuthProvider);
+  if (!auth.isAuthenticated) return [];
+  return await StudentApiService().getNotifications();
+});
+
+// 11. Unread Notifications Count Provider
+final unreadNotificationsCountProvider = Provider.autoDispose<int>((ref) {
+  final notifsAsync = ref.watch(liveStudentNotificationsProvider);
+  final list = notifsAsync.value ?? [];
+  return list.where((n) => n['isRead'] == false).length;
+});
+
+// 12. Group Analytics Provider
+final groupAnalyticsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((ref, groupId) async {
+  final auth = ref.watch(studentAuthProvider);
+  final sId = auth.studentId;
+  if (sId.isEmpty || groupId.isEmpty) return null;
+  return await StudentApiService().getGroupAnalytics(sId, groupId);
+});
+

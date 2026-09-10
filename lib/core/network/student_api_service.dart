@@ -190,5 +190,57 @@ class StudentApiService {
       return [];
     }
   }
+
+  // ==========================================
+  // 6. Notification Center
+  // ==========================================
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    try {
+      final res = await _dio.get('/notifications/student');
+      if (res.data is List) {
+        return List<Map<String, dynamic>>.from(res.data);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getNotifications: $e');
+      return [];
+    }
+  }
+
+  Future<bool> markNotificationAsRead(String notificationId) async {
+    try {
+      await _dio.post('/notifications/$notificationId/read');
+      return true;
+    } catch (e) {
+      debugPrint('Error markNotificationAsRead: $e');
+      return false;
+    }
+  }
+
+  Future<bool> markAllNotificationsAsRead() async {
+    try {
+      await _dio.post('/notifications/mark-all-read');
+      return true;
+    } catch (e) {
+      debugPrint('Error markAllNotificationsAsRead: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 7. Group Competitive Analytics & Leaderboard
+  // ==========================================
+  Future<Map<String, dynamic>?> getGroupAnalytics(String studentId, String groupId) async {
+    try {
+      final res = await _dio.get('/students/$studentId/groups/$groupId/analytics');
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getGroupAnalytics: $e');
+      return null;
+    }
+  }
 }
 

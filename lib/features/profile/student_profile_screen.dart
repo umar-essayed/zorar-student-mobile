@@ -286,7 +286,17 @@ class StudentProfileScreen extends ConsumerWidget {
                     ),
                     trailing: const Icon(LucideIcons.chevronLeft, size: 16),
                     onTap: () async {
-                      final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent("مرحبا، أود الاستفسار بخصوص حساب الطالب ${auth.studentName} كود ${auth.studentCode}")}');
+                      final centerPhone = (branding.supportPhone ?? branding.phone ?? '').replaceAll(RegExp(r'\D'), '');
+                      final targetPhone = centerPhone.isNotEmpty
+                          ? (centerPhone.startsWith('0') ? '2$centerPhone' : centerPhone)
+                          : '';
+
+                      final message = 'مرحبا، أود الاستفسار بخصوص حساب الطالب ${auth.studentName} كود ${auth.studentCode}';
+                      final url = targetPhone.isNotEmpty
+                          ? 'https://wa.me/$targetPhone?text=${Uri.encodeComponent(message)}'
+                          : 'https://wa.me/?text=${Uri.encodeComponent(message)}';
+
+                      final uri = Uri.parse(url);
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                       }

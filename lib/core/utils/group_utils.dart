@@ -8,6 +8,12 @@ class GroupUtils {
     return Map<String, dynamic>.from(item);
   }
 
+  /// Extracts Group ID safely with fallback
+  static String getId(dynamic item) {
+    final g = extractGroup(item);
+    return g['id']?.toString() ?? '';
+  }
+
   /// Extracts Group Name safely with fallback
   static String getName(dynamic item, {String fallback = 'مجموعة دراسية'}) {
     final g = extractGroup(item);

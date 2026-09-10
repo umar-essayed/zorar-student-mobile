@@ -631,76 +631,255 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
 
   Widget _buildResultView(Color primaryColor) {
     final res = _submissionResult!;
-    final score = res['score'] ?? 0;
-    final total = res['total'] ?? 100;
-    final percentage = res['percentage'] ?? 0;
-    final passed = res['passed'] ?? false;
-    final review = res['review'] as List?;
+    final score = num.tryParse(res['score']?.toString() ?? '0') ?? 0;
+    final total = num.tryParse(res['total']?.toString() ?? '100') ?? 100;
+    final percentage = num.tryParse(res['percentage']?.toString() ?? '0') ?? 0;
+    final passed = res['passed'] == true;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Safely parse review list whether server sends List or Map
+    List<Map<String, dynamic>> reviewList = [];
+    if (res['review'] is List) {
+      reviewList = (res['review'] as List)
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    } else if (res['review'] is Map) {
+      reviewList = (res['review'] as Map).values
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    } else if (res['reviewMap'] is Map) {
+      reviewList = (res['reviewMap'] as Map).values
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    }
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text('نتيجة الامتحان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
         children: [
           // Celebration / Status Card
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: passed ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08),
+              color: passed
+                  ? (isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5))
+                  : (isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEF2F2)),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: passed ? Colors.green : Colors.red),
+              border: Border.all(
+                color: passed ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             child: Column(
               children: [
                 Icon(
                   passed ? LucideIcons.award : LucideIcons.alertCircle,
                   size: 64,
-                  color: passed ? Colors.green : Colors.red,
+                  color: passed ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  passed ? 'مبروك! لقد اجتزت الامتحان بنجاح' : 'للأسف لم تتجاوز درجة النجاح هذه المرة',
+                  passed ? 'مبروك! لقد اجتزت الامتحان بنجاح 🌟' : 'حاول مرة أخرى! يمكنك تحسين درجتك القادمة 💪',
                   style: GoogleFonts.cairo(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: passed ? Colors.green[800] : Colors.red[800],
+                    color: passed ? const Color(0xFF059669) : const Color(0xFFDC2626),
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
                       '$score',
-                      style: GoogleFonts.cairo(fontSize: 36, fontWeight: FontWeight.bold, color: passed ? Colors.green : Colors.red),
+                      style: GoogleFonts.cairo(
+                        fontSize: 42,
+                        fontWeight: FontWeight.bold,
+                        color: passed ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                      ),
                     ),
                     Text(
                       ' / $total',
-                      style: GoogleFonts.cairo(fontSize: 22, color: Colors.grey[700]),
+                      style: GoogleFonts.cairo(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
                     ),
                   ],
                 ),
-                Text(
-                  'النسبة المئوية: $percentage%',
-                  style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (passed ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'النسبة المئوية: $percentage%',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: passed ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+
+          // Review of questions if available
+          if (reviewList.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Icon(LucideIcons.fileCheck, size: 20, color: primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  'مراجعة الإجابات والنموذج 📝',
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...reviewList.asMap().entries.map((entry) {
+              final idx = entry.key + 1;
+              final q = entry.value;
+              final qText = q['questionText']?.toString() ?? 'سؤال $idx';
+              final studentAns = q['studentAnswer']?.toString() ?? '';
+              final correctAns = q['correctAnswer']?.toString() ?? '';
+              final isCorrect = q['isCorrect'] == true;
+              final points = q['pointsAwarded'] ?? 0;
+              final explanation = q['explanation']?.toString();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isCorrect
+                        ? Colors.green.withOpacity(0.3)
+                        : Colors.redAccent.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 13,
+                          backgroundColor: isCorrect ? Colors.green : Colors.red,
+                          child: Icon(
+                            isCorrect ? Icons.check : Icons.close,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '$idx. $qText',
+                            style: GoogleFonts.cairo(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isCorrect ? Colors.green : Colors.grey).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+$points',
+                            style: GoogleFonts.cairo(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isCorrect ? Colors.green : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text('إجابتك: ', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[500])),
+                        Text(
+                          studentAns.isEmpty ? 'لم تُجب' : studentAns,
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isCorrect ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!isCorrect && correctAns.isNotEmpty)
+                      Row(
+                        children: [
+                          Text('الإجابة الصحيحة: ', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[500])),
+                          Text(
+                            correctAns,
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (explanation != null && explanation.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'توضيح: $explanation',
+                        style: GoogleFonts.cairo(fontSize: 11, color: Colors.blueGrey),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+          ],
+
           const SizedBox(height: 24),
 
           // Return Button
           SizedBox(
             width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(LucideIcons.arrowRight, size: 18),
+              label: Text(
+                'العودة إلى قائمة الامتحانات',
+                style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
               onPressed: () => Navigator.pop(context),
-              child: Text('العودة إلى شاشة الامتحانات', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
             ),
           ),
         ],

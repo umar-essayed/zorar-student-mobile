@@ -62,7 +62,7 @@ class StudentExamsScreen extends ConsumerWidget {
           }
 
           return ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: exams.length,
             separatorBuilder: (_, __) => const SizedBox(height: 14),
             itemBuilder: (ctx, idx) {
@@ -71,6 +71,12 @@ class StudentExamsScreen extends ConsumerWidget {
               final duration = exam['durationMinutes'] ?? exam['duration'] ?? 30;
               final questionsCount = exam['questionsCount'] ?? (exam['questions'] is List ? (exam['questions'] as List).length : 0);
               final totalScore = exam['totalScore'] ?? exam['totalMarks'] ?? 100;
+              final maxAttempts = exam['maxAttempts'] ?? 1;
+              final mySubmissionsCount = exam['mySubmissionsCount'] ?? 0;
+              final remainingAttempts = exam['remainingAttempts'] ?? (mySubmissionsCount >= maxAttempts ? 0 : (maxAttempts - mySubmissionsCount));
+              final isCompleted = exam['isCompleted'] == true || remainingAttempts <= 0;
+              final lastScore = exam['lastScore'];
+              final lastPercentage = exam['lastPercentage'];
 
               final availableFrom = exam['availableFrom'] != null ? DateTime.tryParse(exam['availableFrom'].toString()) : null;
               final availableUntil = exam['availableUntil'] != null ? DateTime.tryParse(exam['availableUntil'].toString()) : null;
@@ -98,17 +104,23 @@ class StudentExamsScreen extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isExpired
-                                  ? Colors.red.withOpacity(0.12)
-                                  : (isUpcoming ? Colors.blue.withOpacity(0.12) : Colors.green.withOpacity(0.12)),
+                              color: isCompleted
+                                  ? Colors.blueGrey.withOpacity(0.15)
+                                  : (isExpired
+                                      ? Colors.red.withOpacity(0.12)
+                                      : (isUpcoming ? Colors.blue.withOpacity(0.12) : Colors.green.withOpacity(0.12))),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              isExpired ? 'منتهي' : (isUpcoming ? 'مجدول' : 'متاح للحل الآن'),
+                              isCompleted
+                                  ? 'تم التسليم'
+                                  : (isExpired ? 'منتهي' : (isUpcoming ? 'مجدول' : 'متاح للحل الآن')),
                               style: GoogleFonts.cairo(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: isExpired ? Colors.red[800] : (isUpcoming ? Colors.blue[800] : Colors.green[800]),
+                                color: isCompleted
+                                    ? Colors.blueGrey[800]
+                                    : (isExpired ? Colors.red[800] : (isUpcoming ? Colors.blue[800] : Colors.green[800])),
                               ),
                             ),
                           ),
@@ -124,8 +136,36 @@ class StudentExamsScreen extends ConsumerWidget {
                           _buildChip(LucideIcons.clock, '$duration دقيقة'),
                           _buildChip(LucideIcons.helpCircle, '$questionsCount سؤال'),
                           _buildChip(LucideIcons.award, '$totalScore درجة'),
+                          _buildChip(
+                            LucideIcons.repeat,
+                            'المحاولات: $remainingAttempts من $maxAttempts',
+                            color: remainingAttempts > 0 ? Colors.green : Colors.orange,
+                          ),
                         ],
                       ),
+
+                      // Previous Grade Card if already solved
+                      if (lastScore != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.withOpacity(0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(LucideIcons.checkCircle, color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'درجتك المسجلة: $lastScore من $totalScore ($lastPercentage%)',
+                                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green[800]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       if (availableUntil != null) ...[
                         const SizedBox(height: 10),
@@ -149,15 +189,22 @@ class StudentExamsScreen extends ConsumerWidget {
                         height: 44,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isExpired ? Colors.grey : branding.primaryColor,
+                            backgroundColor: (isCompleted || isExpired) ? Colors.grey : branding.primaryColor,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: const Icon(LucideIcons.play, size: 16),
+                          icon: Icon(
+                            isCompleted ? LucideIcons.lock : (isExpired ? LucideIcons.xCircle : LucideIcons.play),
+                            size: 16,
+                          ),
                           label: Text(
-                            isExpired ? 'انتهت فترة الامتحان' : (isUpcoming ? 'لم يبدأ بعد' : 'بدء الاختبار الآن'),
+                            isCompleted
+                                ? 'استُنفدت المحاولات ($lastScore/$totalScore)'
+                                : (isExpired
+                                    ? 'انتهت فترة الامتحان'
+                                    : (isUpcoming ? 'لم يبدأ بعد' : 'بدء الاختبار الآن')),
                             style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          onPressed: (isExpired || isUpcoming)
+                          onPressed: (isCompleted || isExpired || isUpcoming)
                               ? null
                               : () {
                                   Navigator.push(
@@ -183,19 +230,20 @@ class StudentExamsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChip(IconData icon, String text) {
+  Widget _buildChip(IconData icon, String text, {Color? color}) {
+    final chipColor = color ?? Colors.grey[700]!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.08),
+        color: chipColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.grey[700]),
+          Icon(icon, size: 12, color: chipColor),
           const SizedBox(width: 4),
-          Text(text, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey[800])),
+          Text(text, style: GoogleFonts.cairo(fontSize: 11, color: chipColor, fontWeight: color != null ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );

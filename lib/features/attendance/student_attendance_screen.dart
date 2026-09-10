@@ -25,6 +25,7 @@ class _StudentAttendanceGradesScreenState
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _selectedGroupId;
+  String _selectedAssessmentType = 'ALL'; // ALL, QUIZ, EXAM
 
   @override
   void initState() {
@@ -34,6 +35,9 @@ class _StudentAttendanceGradesScreenState
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 1),
     );
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -195,6 +199,48 @@ class _StudentAttendanceGradesScreenState
                   ),
                 ),
 
+              // Assessment Type Filter Bar (shown only when on Grades Tab)
+              if (_tabController.index == 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'نوع التقييم:',
+                        style: GoogleFonts.cairo(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              _buildTypeFilterChip('الكل', 'ALL', branding, isDark),
+                              const SizedBox(width: 6),
+                              _buildTypeFilterChip('كويزات الحصص 📝', 'QUIZ', branding, isDark),
+                              const SizedBox(width: 6),
+                              _buildTypeFilterChip('امتحانات شاملة 🏆', 'EXAM', branding, isDark),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -207,6 +253,43 @@ class _StudentAttendanceGradesScreenState
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTypeFilterChip(
+    String label,
+    String typeKey,
+    BrandingState branding,
+    bool isDark,
+  ) {
+    final isSelected = _selectedAssessmentType == typeKey;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: GoogleFonts.cairo(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected
+              ? branding.primaryColor
+              : (isDark ? Colors.grey[300] : const Color(0xFF334155)),
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _selectedAssessmentType = typeKey);
+        }
+      },
+      selectedColor: branding.primaryColor.withOpacity(0.15),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected
+              ? branding.primaryColor
+              : (isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFCBD5E1)),
+        ),
       ),
     );
   }
@@ -263,6 +346,7 @@ class _StudentAttendanceGradesScreenState
           final sessionTitle = session?['title']?.toString() ??
               'حصة رقم ${session?['sessionNumber'] ?? ''}';
           final groupName = GroupUtils.getName(att['group'] ?? att);
+          final subjectName = GroupUtils.getSubject(att['group'] ?? att);
 
           DateTime? date;
           if (att['scannedAt'] != null) {
@@ -316,16 +400,43 @@ class _StudentAttendanceGradesScreenState
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (groupName.isNotEmpty)
-                        Text(
-                          groupName,
-                          style: GoogleFonts.cairo(
-                            fontSize: 11.5,
-                            color: branding.primaryColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (subjectName.isNotEmpty) ...[
+                            Text(
+                              subjectName,
+                              style: GoogleFonts.cairo(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: branding.primaryColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (groupName.isNotEmpty)
+                              Text(
+                                ' • ',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                          ],
+                          if (groupName.isNotEmpty)
+                            Flexible(
+                              child: Text(
+                                groupName,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  color: isDark ? Colors.grey[300] : const Color(0xFF475569),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
                       if (dateStr.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
@@ -393,6 +504,8 @@ class _StudentAttendanceGradesScreenState
         a['sessionTitle'] = att['session']?['title'];
         a['sessionNumber'] = att['session']?['sessionNumber'];
         a['groupName'] = GroupUtils.getName(att['group'] ?? att);
+        a['subjectName'] = GroupUtils.getSubject(att['group'] ?? att);
+        a['date'] = att['scannedAt'] ?? att['session']?['scheduledDate'];
         if (!combinedAssessments.any((item) => item['id'] == a['id'])) {
           combinedAssessments.add(a);
         }
@@ -409,7 +522,8 @@ class _StudentAttendanceGradesScreenState
           'sessionTitle': exam?['title']?.toString() ?? 'امتحان إلكتروني شامل',
           'score': es['score'],
           'maxScore': es['total'] ?? exam?['totalScore'] ?? 100,
-          'groupName': 'امتحان أونلاين',
+          'groupName': exam?['subject']?['name']?.toString() ?? 'امتحان إلكتروني',
+          'subjectName': exam?['subject']?['name']?.toString() ?? '',
           'homeworkDone': true,
           'date': es['submittedAt']?.toString() ?? '',
           'notes': es['score'] != null ? 'تم التصحيح التلقائي ورصد الدرجة' : '',
@@ -417,7 +531,18 @@ class _StudentAttendanceGradesScreenState
       }
     }
 
-    if (combinedAssessments.isEmpty) {
+    // Filter by assessment type
+    final filteredAssessments = combinedAssessments.where((item) {
+      if (_selectedAssessmentType == 'QUIZ') {
+        return item['type'] == 'QUIZ' || item['type'] == 'ASSESSMENT';
+      }
+      if (_selectedAssessmentType == 'EXAM') {
+        return item['type'] == 'EXAM';
+      }
+      return true;
+    }).toList();
+
+    if (filteredAssessments.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -425,7 +550,7 @@ class _StudentAttendanceGradesScreenState
             Icon(LucideIcons.award, color: Colors.grey[400], size: 54),
             const SizedBox(height: 12),
             Text(
-              'لم يتم رصد درجات أو كويزات بعد',
+              'لا توجد درجات مطابقة لهذا التصنيف',
               style: GoogleFonts.cairo(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -446,10 +571,10 @@ class _StudentAttendanceGradesScreenState
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       physics: const BouncingScrollPhysics(),
-      itemCount: combinedAssessments.length,
+      itemCount: filteredAssessments.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final item = combinedAssessments[index];
+        final item = filteredAssessments[index];
         final type = item['type']?.toString() ?? 'QUIZ';
 
         // Safe numeric parsing for score & maxScore
@@ -465,6 +590,19 @@ class _StudentAttendanceGradesScreenState
         final group = (item['groupName'] is String && item['groupName'].toString().isNotEmpty)
             ? item['groupName'].toString()
             : GroupUtils.getName(item['group'] ?? item);
+        final subject = (item['subjectName'] is String && item['subjectName'].toString().isNotEmpty)
+            ? item['subjectName'].toString()
+            : GroupUtils.getSubject(item['group'] ?? item);
+
+        DateTime? parsedDate;
+        if (item['date'] != null && item['date'].toString().isNotEmpty) {
+          parsedDate = DateTime.tryParse(item['date'].toString());
+        } else if (item['createdAt'] != null) {
+          parsedDate = DateTime.tryParse(item['createdAt'].toString());
+        }
+        final formattedDate = parsedDate != null
+            ? DateFormat('EEEE, d MMM yyyy - hh:mm a', 'ar').format(parsedDate)
+            : '';
 
         final ratio = (maxScore > 0 && !maxScore.isNaN) ? (score / maxScore) : 0.0;
         final safeRatio = ratio.isFinite ? ratio.clamp(0.0, 1.0) : 0.0;
@@ -537,13 +675,47 @@ class _StudentAttendanceGradesScreenState
                             ),
                           ],
                         ),
-                        if (group.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            if (subject.isNotEmpty) ...[
+                              Text(
+                                subject,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: branding.primaryColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (group.isNotEmpty)
+                                Text(
+                                  ' • ',
+                                  style: GoogleFonts.cairo(fontSize: 11.5, color: Colors.grey),
+                                ),
+                            ],
+                            if (group.isNotEmpty)
+                              Flexible(
+                                child: Text(
+                                  group,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (formattedDate.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            group,
+                            formattedDate,
                             style: GoogleFonts.cairo(
-                              fontSize: 11.5,
-                              color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                              fontSize: 10.5,
+                              color: isDark ? Colors.grey[500] : const Color(0xFF94A3B8),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

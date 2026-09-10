@@ -12,6 +12,8 @@ class StudentBrandingModel {
   final Color secondaryColor;
   final bool isDarkMode;
   final String? subdomain;
+  final String? phone;
+  final String? supportPhone;
 
   const StudentBrandingModel({
     this.centerName = 'السنتر التعليمي',
@@ -21,6 +23,8 @@ class StudentBrandingModel {
     this.secondaryColor = const Color(0xFF0D9488), // Teal accent
     this.isDarkMode = false,
     this.subdomain,
+    this.phone,
+    this.supportPhone,
   });
 
   Color get accentColor => secondaryColor;
@@ -33,6 +37,8 @@ class StudentBrandingModel {
     Color? secondaryColor,
     bool? isDarkMode,
     String? subdomain,
+    String? phone,
+    String? supportPhone,
   }) {
     return StudentBrandingModel(
       centerName: centerName ?? this.centerName,
@@ -42,6 +48,8 @@ class StudentBrandingModel {
       secondaryColor: secondaryColor ?? this.secondaryColor,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       subdomain: subdomain ?? this.subdomain,
+      phone: phone ?? this.phone,
+      supportPhone: supportPhone ?? this.supportPhone,
     );
   }
 }
@@ -78,6 +86,10 @@ class StudentBrandingNotifier extends StateNotifier<StudentBrandingModel> {
     final logoUrl = branding['logoUrl']?.toString();
     final bannerUrl = branding['heroBannerUrl']?.toString();
     final subdomain = tenant['subdomain']?.toString();
+    final phone = tenant['phone']?.toString();
+    final supportPhone = branding['supportPhone']?.toString() ??
+        branding['phone']?.toString() ??
+        phone;
 
     Color primary = state.primaryColor;
     if (branding['primaryColor'] != null) {
@@ -97,6 +109,8 @@ class StudentBrandingNotifier extends StateNotifier<StudentBrandingModel> {
       secondaryColor: secondary,
       isDarkMode: isDark ?? state.isDarkMode,
       subdomain: subdomain,
+      phone: phone,
+      supportPhone: supportPhone,
     );
   }
 
