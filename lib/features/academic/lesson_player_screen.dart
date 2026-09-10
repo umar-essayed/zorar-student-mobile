@@ -1118,8 +1118,9 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFullscreenPlayer(
     dynamic auth,
