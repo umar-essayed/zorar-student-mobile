@@ -15,6 +15,10 @@ class SoundService {
     HapticFeedback.lightImpact();
   }
 
+  static void playTap() {
+    HapticFeedback.lightImpact();
+  }
+
   static void selectionClick() {
     HapticFeedback.selectionClick();
   }

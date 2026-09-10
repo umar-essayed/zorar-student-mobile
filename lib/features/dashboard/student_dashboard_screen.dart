@@ -771,7 +771,7 @@ class StudentDashboardScreen extends ConsumerWidget {
             child: InkWell(
               onTap: groupId.isNotEmpty
                   ? () {
-                      SoundService.playTap();
+                      SoundService.lightImpact();
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => GroupAnalyticsScreen(
