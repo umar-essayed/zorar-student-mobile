@@ -10,6 +10,7 @@ import '../../core/theme/student_theme.dart';
 import '../id_card/student_id_card_screen.dart';
 import '../exams/student_exams_screen.dart';
 import '../profile/student_profile_screen.dart';
+import '../schedule/student_schedule_screen.dart';
 
 class StudentDashboardScreen extends ConsumerWidget {
   final Function(int)? onNavigateTab;
@@ -466,6 +467,17 @@ class StudentDashboardScreen extends ConsumerWidget {
               if (onNavigateTab != null) {
                 onNavigateTab(2); // Courses Tab
               }
+            },
+          ),
+          _buildActionButton(
+            icon: LucideIcons.calendarDays,
+            label: 'جدول الحصص',
+            color: Colors.purpleAccent,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StudentScheduleScreen()),
+              );
             },
           ),
           _buildActionButton(

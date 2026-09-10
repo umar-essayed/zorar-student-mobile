@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/providers/student_auth_provider.dart';
 import '../../core/providers/student_data_providers.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
@@ -50,6 +53,38 @@ class _StudentAttendanceGradesScreenState
         backgroundColor: StudentTheme.surfaceCard,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.share2, color: Colors.white70, size: 20),
+            tooltip: 'مشاركة التقرير عبر واتساب',
+            onPressed: () async {
+              final auth = ref.read(studentAuthProvider);
+              final student = profileAsync.value ?? auth.student ?? {};
+              final attList = (student['attendances'] as List?) ?? [];
+              final presentCount = attList.where((a) => a['status'] == 'PRESENT').length;
+              final absentCount = attList.where((a) => a['status'] == 'ABSENT').length;
+              final guardianPhone = student['guardianPhone']?.toString() ?? '';
+
+              final reportText = 'تقرير متابعة الطالب من منظومة ${branding.centerName}:\n'
+                  'اسم الطالب: ${auth.studentName}\n'
+                  'كود الطالب: ${auth.studentCode}\n'
+                  'المرحلة: ${auth.academicYear}\n'
+                  'عدد الحصص الكلية: ${attList.length}\n'
+                  'مرات الحضور: $presentCount\n'
+                  'مرات الغياب: $absentCount\n'
+                  'نتمنى له دوام التفوق والنجاح 🌟';
+
+              final url = guardianPhone.isNotEmpty
+                  ? 'https://wa.me/2$guardianPhone?text=${Uri.encodeComponent(reportText)}'
+                  : 'https://wa.me/?text=${Uri.encodeComponent(reportText)}';
+
+              final uri = Uri.parse(url);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: branding.accentColor,

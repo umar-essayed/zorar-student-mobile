@@ -144,4 +144,51 @@ class StudentApiService {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> getLessonPlayerToken(String lessonId) async {
+    try {
+      final res = await _dio.get('/courses/lessons/$lessonId/player-token');
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getLessonPlayerToken: $e');
+      return null;
+    }
+  }
+
+  Future<bool> logWatchProgress({
+    required String lessonId,
+    required int watchedSeconds,
+    bool isCompleted = false,
+  }) async {
+    try {
+      await _dio.post('/courses/lessons/$lessonId/progress', data: {
+        'watchedSeconds': watchedSeconds,
+        'isCompleted': isCompleted,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error logWatchProgress: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // 5. Center Announcements & Broadcasts
+  // ==========================================
+  Future<List<Map<String, dynamic>>> getAnnouncements() async {
+    try {
+      final res = await _dio.get('/announcements');
+      if (res.data is List) {
+        return List<Map<String, dynamic>>.from(res.data);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getAnnouncements: $e');
+      return [];
+    }
+  }
 }
+
