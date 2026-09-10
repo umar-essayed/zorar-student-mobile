@@ -52,10 +52,14 @@ jobs:
       - name: Build Signed Release APK (Universal Production)
         run: flutter build apk --release --no-tree-shake-icons
 
+      - name: Build Signed Android App Bundle (Google Play Store AAB)
+        run: flutter build appbundle --release --no-tree-shake-icons
+
       - name: Package & Generate Checksums
         run: |
           mkdir -p output_dist
           cp build/app/outputs/flutter-apk/app-release.apk output_dist/zorar-student-release-signed.apk
+          cp build/app/outputs/bundle/release/app-release.aab output_dist/zorar-student-release-signed.aab
           cd output_dist
           sha256sum * > SHA256SUMS.txt
           echo "Generated Distribution Packages:"
@@ -83,13 +87,17 @@ jobs:
 
             ---
             ### 📦 ملفات التثبيت المتاحة:
-            1. 📲 **`zorar-student-release-signed.apk`:**
-               - حزمة إنتاج رسمية موثقة وموقعة بالشهادة السحابية، محسنة بالكامل وخفيفة الحجم وجاهزة للتثبيت المباشر على جميع هواتف أندرويد.
-            2. 🛡️ **`SHA256SUMS.txt`:**
+            1. 📲 **`zorar-student-release-signed.apk` (نسخة التثبيت المباشر السريعة):**
+               - حزمة إنتاج موثقة وموقعة جاهزة للتثبيت الفوري على أجهزة الطلاب وأولياء الأمور.
+            2. 🏬 **`zorar-student-release-signed.aab` (حزمة متجر Google Play Store):**
+               - حزمة Android App Bundle موجهة للرفع والنشر المباشر على متجر Google Play Console.
+            3. 🛡️ **`SHA256SUMS.txt`:**
                - البصمات الرقمية للتحقق من سلامة وصحة الملفات.
 
             ---
             ### ✨ أبرز ميزات تطبيق الطالب:
+            - 🖥️ **مشغل الفيديو بملء الشاشة وتدوير أفقي (Auto-Landscape & Fullscreen):** إمكانية تكبير الفيديو لملء الشاشة مع واجهة غامرة بالكامل وحماية العلامة المائية المانعة للقرصنة.
+            - ⏱️ **حماية مؤقت الامتحان ضد التلاعب بالساعة (Anti-Tamper Timer):** احتساب الزمن المستغرق بشكل ثابت ومنع تمديد وقت الامتحان عبر تغيير ساعة الهاتف.
             - 🆔 **بطاقة الطالب الرقمية الذكية (Digital Student ID & QR):** باركود ديناميكي عالي الدقة لإجراء الحضور التلقائي عند بوابات السنتر.
             - ⏱️ **غرفة الامتحانات الإلكترونية المباشرة:** تايمر عد تنازلي، تسليم فوري وتصحيح ذكي وإظهار النتيجة فوراً.
             - 📊 **سجل الحضور والغياب:** تتبع تفصيلي لكل الحصص وتواريخها وتنبيهات الغياب.

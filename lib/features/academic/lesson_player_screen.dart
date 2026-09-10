@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -48,6 +49,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
   // In-app embedded player & watch progress
   WebViewController? _webViewController;
   bool _isPlayingInApp = false;
+  bool _isFullscreen = false;
   int _watchedSeconds = 0;
   int _totalDurationSeconds = 0;
   int _watchPercent = 0;
@@ -73,9 +75,32 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     });
   }
 
+  Future<void> _toggleFullscreen() async {
+    final nextState = !_isFullscreen;
+    if (nextState) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    if (mounted) {
+      setState(() => _isFullscreen = nextState);
+    }
+  }
+
   @override
   void dispose() {
     _watermarkTimer?.cancel();
+    if (_isFullscreen) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     SecurityService.disableSecureScreen();
     super.dispose();
   }
@@ -509,156 +534,198 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
 
     final isCompleted = _isMarkedCompleted || _watchPercent >= _completionThreshold;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: Text(
-          title,
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Embedded In-App Player Container
-            Container(
-              height: 235,
-              width: double.infinity,
-              color: Colors.black,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_isPlayingInApp && _webViewController != null)
-                    WebViewWidget(controller: _webViewController!)
-                  else ...[
-                    // Thumbnail
-                    if (thumbnailUrl != null)
-                      Image.network(
-                        thumbnailUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B)),
-                      )
-                    else
-                      Container(
-                        color: const Color(0xFF1E293B),
-                        child: Center(
-                          child: Icon(LucideIcons.video, color: Colors.white24, size: 64),
-                        ),
-                      ),
-
-                    // Dark Gradient
+    return PopScope(
+      canPop: !_isFullscreen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isFullscreen) {
+          _toggleFullscreen();
+        }
+      },
+      child: _isFullscreen
+          ? _buildFullscreenPlayer(auth, branding, thumbnailUrl, isVideoAvailable)
+          : Scaffold(
+              backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+              appBar: AppBar(
+                title: Text(
+                  title,
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              body: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Embedded In-App Player Container
                     Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.black.withOpacity(0.35),
-                            Colors.black.withOpacity(0.65),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-
-                    // Center Play Button
-                    Center(
-                      child: InkWell(
-                        onTap: _startInAppPlayer,
-                        borderRadius: BorderRadius.circular(50),
-                        child: Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: isVideoAvailable ? branding.primaryColor : Colors.black87,
-                            shape: BoxShape.circle,
-                            border: isVideoAvailable ? null : Border.all(color: Colors.amber, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isVideoAvailable ? branding.primaryColor : Colors.black).withOpacity(0.5),
-                                blurRadius: 20,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            isVideoAvailable ? LucideIcons.play : LucideIcons.lock,
-                            color: isVideoAvailable ? Colors.white : Colors.amber,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Hint at bottom of thumbnail
-                    Positioned(
-                      bottom: 12,
-                      left: 16,
-                      right: 16,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      height: 235,
+                      width: double.infinity,
+                      color: Colors.black,
+                      child: Stack(
+                        fit: StackFit.expand,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.75),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isVideoAvailable ? LucideIcons.shieldCheck : LucideIcons.lock,
-                                  color: isVideoAvailable ? const Color(0xFF10B981) : Colors.amber,
-                                  size: 14,
+                          if (_isPlayingInApp && _webViewController != null)
+                            WebViewWidget(controller: _webViewController!)
+                          else ...[
+                            // Thumbnail
+                            if (thumbnailUrl != null)
+                              Image.network(
+                                thumbnailUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E293B)),
+                              )
+                            else
+                              Container(
+                                color: const Color(0xFF1E293B),
+                                child: Center(
+                                  child: Icon(LucideIcons.video, color: Colors.white24, size: 64),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  isVideoAvailable
-                                      ? 'مشغل داخلي مؤمّن بحقوق الطالب 🔒'
-                                      : (_lockMessage ?? 'المحاضرة قيد التجهيز أو مغلقة 🔒'),
+                              ),
+
+                            // Dark Gradient
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.black.withOpacity(0.35),
+                                    Colors.black.withOpacity(0.65),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
+                            ),
+
+                            // Center Play Button
+                            Center(
+                              child: InkWell(
+                                onTap: _startInAppPlayer,
+                                borderRadius: BorderRadius.circular(50),
+                                child: Container(
+                                  padding: const EdgeInsets.all(18),
+                                  decoration: BoxDecoration(
+                                    color: isVideoAvailable ? branding.primaryColor : Colors.black87,
+                                    shape: BoxShape.circle,
+                                    border: isVideoAvailable ? null : Border.all(color: Colors.amber, width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (isVideoAvailable ? branding.primaryColor : Colors.black).withOpacity(0.5),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    isVideoAvailable ? LucideIcons.play : LucideIcons.lock,
+                                    color: isVideoAvailable ? Colors.white : Colors.amber,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Hint at bottom of thumbnail
+                            Positioned(
+                              bottom: 12,
+                              left: 16,
+                              right: 16,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.75),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          isVideoAvailable ? LucideIcons.shieldCheck : LucideIcons.lock,
+                                          color: isVideoAvailable ? const Color(0xFF10B981) : Colors.amber,
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          isVideoAvailable
+                                              ? 'مشغل داخلي مؤمّن بحقوق الطالب 🔒'
+                                              : (_lockMessage ?? 'المحاضرة قيد التجهيز أو مغلقة 🔒'),
+                                          style: GoogleFonts.cairo(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // Fullscreen Expand Button (Available in portrait)
+                          Positioned(
+                            top: 10,
+                            left: 10,
+                            child: Material(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                              child: InkWell(
+                                onTap: _toggleFullscreen,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(LucideIcons.maximize2, color: Colors.white, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'ملء الشاشة',
+                                        style: GoogleFonts.cairo(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Dynamic Anti-Piracy Floating Watermark (Always Active on Top)
+                          AnimatedAlign(
+                            duration: const Duration(seconds: 2),
+                            curve: Curves.easeInOut,
+                            alignment: FractionalOffset(_watermarkX, _watermarkY),
+                            child: IgnorePointer(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.45),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${auth.studentName} • ${auth.studentCode} • ${auth.studentPhone}',
                                   style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontSize: 11,
+                                    color: Colors.white.withOpacity(0.75),
+                                    fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
 
-                  // Dynamic Anti-Piracy Floating Watermark (Always Active on Top)
-                  AnimatedAlign(
-                    duration: const Duration(seconds: 2),
-                    curve: Curves.easeInOut,
-                    alignment: FractionalOffset(_watermarkX, _watermarkY),
-                    child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.45),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${auth.studentName} • ${auth.studentCode} • ${auth.studentPhone}',
-                          style: GoogleFonts.cairo(
-                            color: Colors.white.withOpacity(0.75),
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             // 2. Watch Progress & Completion Status Bar
             Container(
@@ -1053,4 +1120,117 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
       ),
     );
   }
+
+  Widget _buildFullscreenPlayer(
+    dynamic auth,
+    BrandingState branding,
+    String? thumbnailUrl,
+    bool isVideoAvailable,
+  ) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Embedded Player or Video Surface
+          if (_isPlayingInApp && _webViewController != null)
+            WebViewWidget(controller: _webViewController!)
+          else ...[
+            if (thumbnailUrl != null)
+              Image.network(
+                thumbnailUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: Colors.black),
+              )
+            else
+              Container(
+                color: Colors.black,
+                child: const Center(
+                  child: Icon(LucideIcons.video, color: Colors.white24, size: 80),
+                ),
+              ),
+
+            Center(
+              child: InkWell(
+                onTap: _startInAppPlayer,
+                borderRadius: BorderRadius.circular(50),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: isVideoAvailable ? branding.primaryColor : Colors.black87,
+                    shape: BoxShape.circle,
+                    border: isVideoAvailable ? null : Border.all(color: Colors.amber, width: 2),
+                  ),
+                  child: Icon(
+                    isVideoAvailable ? LucideIcons.play : LucideIcons.lock,
+                    color: isVideoAvailable ? Colors.white : Colors.amber,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // 2. Dynamic Anti-Piracy Floating Watermark (Always Active on Top in Fullscreen)
+          AnimatedAlign(
+            duration: const Duration(seconds: 2),
+            curve: Curves.easeInOut,
+            alignment: FractionalOffset(_watermarkX, _watermarkY),
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${auth.studentName} • ${auth.studentCode} • ${auth.studentPhone}',
+                  style: GoogleFonts.cairo(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // 3. Exit Fullscreen Floating Button (Safe area top-left)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(30),
+                child: InkWell(
+                  onTap: _toggleFullscreen,
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(LucideIcons.minimize2, color: Colors.white, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          'تصغير الشاشة',
+                          style: GoogleFonts.cairo(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

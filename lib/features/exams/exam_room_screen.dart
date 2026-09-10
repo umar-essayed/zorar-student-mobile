@@ -41,6 +41,11 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
   // Post-submission review state
   Map<String, dynamic>? _submissionResult;
 
+  final Stopwatch _monotonicStopwatch = Stopwatch();
+  int _lastKnownWallClock = 0;
+  int _examElapsedSeconds = 0;
+  int _totalExamSeconds = 0;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +56,7 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _monotonicStopwatch.stop();
     SecurityService.disableSecureScreen();
     super.dispose();
   }
@@ -92,20 +98,51 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
 
       final durationMin = (exam['durationMinutes'] ?? exam['duration'] ?? 30) as int;
       final totalExamSeconds = durationMin * 60;
+      _totalExamSeconds = totalExamSeconds;
 
-      // Timer Persistence using SharedPreferences:
-      // Even if the student exits and re-enters, the real elapsed time continues ticking
+      // Timer Persistence & Tamper Resistance using Monotonic Clock + SharedPreferences:
+      // Prevents clock manipulation (rolling backward) from granting infinite or extended time.
       final prefs = await SharedPreferences.getInstance();
       final timerKey = 'exam_start_time_${widget.examId}';
-      int remainingSeconds = totalExamSeconds;
+      final elapsedKey = 'exam_elapsed_sec_${widget.examId}';
+      final lastTickKey = 'exam_last_tick_ms_${widget.examId}';
 
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
       final storedStartTime = prefs.getInt(timerKey);
+      final storedElapsed = prefs.getInt(elapsedKey) ?? 0;
+      final storedLastTick = prefs.getInt(lastTickKey) ?? nowMs;
+
+      int elapsedSeconds = 0;
+
       if (storedStartTime == null) {
-        await prefs.setInt(timerKey, DateTime.now().millisecondsSinceEpoch);
+        await prefs.setInt(timerKey, nowMs);
+        await prefs.setInt(elapsedKey, 0);
+        await prefs.setInt(lastTickKey, nowMs);
+        elapsedSeconds = 0;
       } else {
-        final elapsedSeconds = (DateTime.now().millisecondsSinceEpoch - storedStartTime) ~/ 1000;
-        remainingSeconds = totalExamSeconds - elapsedSeconds;
+        // Calculate wall-clock elapsed
+        final wallClockElapsed = (nowMs - storedStartTime) ~/ 1000;
+
+        // Check if device clock was rolled backwards relative to last saved tick
+        final isClockManipulated = nowMs < storedLastTick || wallClockElapsed < storedElapsed;
+
+        if (isClockManipulated) {
+          // Clock was rolled backwards! Enforce storedElapsed as the baseline
+          elapsedSeconds = storedElapsed;
+          // Resync start time so wall clock doesn't remain corrupted
+          await prefs.setInt(timerKey, nowMs - (elapsedSeconds * 1000));
+        } else {
+          // Normal flow: elapsed is at least max of wall clock and stored ticks
+          elapsedSeconds = wallClockElapsed > storedElapsed ? wallClockElapsed : storedElapsed;
+        }
       }
+
+      _examElapsedSeconds = elapsedSeconds;
+      _lastKnownWallClock = nowMs;
+      _monotonicStopwatch.reset();
+      _monotonicStopwatch.start();
+
+      final remainingSeconds = totalExamSeconds - elapsedSeconds;
 
       setState(() {
         _exam = exam;
@@ -141,10 +178,34 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_secondsRemaining > 0) {
-        setState(() => _secondsRemaining--);
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+      // Always advance elapsed seconds; ignore any clock rollback attempts
+      _examElapsedSeconds++;
+      _lastKnownWallClock = nowMs;
+
+      final remaining = _totalExamSeconds - _examElapsedSeconds;
+
+      if (remaining > 0) {
+        setState(() {
+          _secondsRemaining = remaining;
+        });
+
+        // Periodically save elapsed progress every 5 seconds to reduce storage operations
+        if (_examElapsedSeconds % 5 == 0) {
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setInt('exam_elapsed_sec_${widget.examId}', _examElapsedSeconds);
+            prefs.setInt('exam_last_tick_ms_${widget.examId}', nowMs);
+          });
+        }
       } else {
         _timer?.cancel();
+        setState(() {
+          _secondsRemaining = 0;
+        });
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setInt('exam_elapsed_sec_${widget.examId}', _totalExamSeconds);
+        });
         _autoSubmitOnTimeUp();
       }
     });
@@ -230,6 +291,8 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
       // Clean timer persistence upon successful submission
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('exam_start_time_${widget.examId}');
+      await prefs.remove('exam_elapsed_sec_${widget.examId}');
+      await prefs.remove('exam_last_tick_ms_${widget.examId}');
 
       setState(() {
         _isSubmitting = false;
