@@ -147,7 +147,12 @@ class StudentApiService {
 
   Future<Map<String, dynamic>?> getLessonPlayerToken(String lessonId) async {
     try {
-      final res = await _dio.get('/courses/lessons/$lessonId/player-token');
+      Response res;
+      try {
+        res = await _dio.get('/courses/lessons/$lessonId/secure-play');
+      } catch (_) {
+        res = await _dio.get('/courses/lessons/$lessonId/player-token');
+      }
       if (res.data is Map) {
         return Map<String, dynamic>.from(res.data);
       }
@@ -164,10 +169,17 @@ class StudentApiService {
     bool isCompleted = false,
   }) async {
     try {
-      await _dio.post('/courses/lessons/$lessonId/progress', data: {
-        'watchedSeconds': watchedSeconds,
-        'isCompleted': isCompleted,
-      });
+      try {
+        await _dio.post('/courses/lessons/$lessonId/watch-progress', data: {
+          'watchedSeconds': watchedSeconds,
+          'isCompleted': isCompleted,
+        });
+      } catch (_) {
+        await _dio.post('/courses/lessons/$lessonId/progress', data: {
+          'watchedSeconds': watchedSeconds,
+          'isCompleted': isCompleted,
+        });
+      }
       return true;
     } catch (e) {
       debugPrint('Error logWatchProgress: $e');

@@ -16,4 +16,14 @@ class SecurityService {
       await _channel.invokeMethod('disableSecure');
     } catch (_) {}
   }
+
+  /// Requests notification permission on Android 13+ (POST_NOTIFICATIONS)
+  static Future<bool> requestNotificationPermission() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('requestNotificationPermission');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
 }

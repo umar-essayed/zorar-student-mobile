@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/student_api_service.dart';
 import '../../core/providers/student_auth_provider.dart';
+import '../../core/providers/student_data_providers.dart';
 import '../../core/services/security_service.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
@@ -63,15 +64,40 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     super.dispose();
   }
 
+  String _resolveMediaUrl(String rawUrl) {
+    if (rawUrl.isEmpty) return rawUrl;
+    final trimmed = rawUrl.trim();
+    if (trimmed.contains('media.zorar-code.com')) return trimmed;
+
+    final uploadFileIdx = trimmed.indexOf('/api/v1/uploads/file/');
+    if (uploadFileIdx != -1) {
+      final s3Key = trimmed.substring(uploadFileIdx + '/api/v1/uploads/file/'.length);
+      return 'https://media.zorar-code.com/$s3Key';
+    }
+
+    if (trimmed.startsWith('tenants/')) {
+      return 'https://media.zorar-code.com/$trimmed';
+    }
+
+    if (trimmed.startsWith('/tenants/')) {
+      return 'https://media.zorar-code.com${trimmed.substring(1)}';
+    }
+
+    return trimmed;
+  }
+
   void _initVideo() {
     final directUrl = widget.lesson['videoUrl']?.toString() ??
         widget.lesson['url']?.toString() ??
         widget.lesson['encryptedVideoId']?.toString() ??
         '';
 
-    _pdfAttachmentUrl = widget.lesson['pdfAttachmentUrl']?.toString() ??
+    final rawPdf = widget.lesson['pdfAttachmentUrl']?.toString() ??
         widget.lesson['attachmentUrl']?.toString() ??
         widget.lesson['fileUrl']?.toString();
+    if (rawPdf != null && rawPdf.isNotEmpty) {
+      _pdfAttachmentUrl = _resolveMediaUrl(rawPdf);
+    }
 
     _youtubeId = _extractYouTubeId(directUrl);
     _resolvedVideoUrl = directUrl;
@@ -96,7 +122,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
             _youtubeId = _extractYouTubeId(rawId) ?? _youtubeId;
           }
           if (pdf != null && pdf.isNotEmpty) {
-            _pdfAttachmentUrl = pdf;
+            _pdfAttachmentUrl = _resolveMediaUrl(pdf);
           }
           _lockMessage = null;
         });
@@ -125,6 +151,52 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     return match?.group(1);
   }
 
+  Future<void> _handleOpenFile(BuildContext context, String fileUrl, String title) async {
+    final resolved = _resolveMediaUrl(fileUrl);
+    final uri = Uri.tryParse(resolved);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('رابط الملف غير متاح حالياً', style: GoogleFonts.cairo())),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(LucideIcons.cloudDownload, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'جاري فتح وتنزيل $title عبر سحابة R2 الفائقة...',
+                style: GoogleFonts.cairo(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0F172A),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر فتح الملف: $e', style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _playVideo() async {
     SoundService.lightImpact();
     final id = _youtubeId;
@@ -133,9 +205,10 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     if (id != null && id.isNotEmpty) {
       targetUrl = 'https://www.youtube.com/watch?v=$id';
     } else if (_resolvedVideoUrl != null && _resolvedVideoUrl!.isNotEmpty) {
-      targetUrl = _resolvedVideoUrl!.startsWith('http')
-          ? _resolvedVideoUrl!
-          : 'https://$_resolvedVideoUrl';
+      targetUrl = _resolveMediaUrl(_resolvedVideoUrl!);
+      if (!targetUrl.startsWith('http')) {
+        targetUrl = 'https://$targetUrl';
+      }
     }
 
     if (targetUrl.isEmpty) {
@@ -186,7 +259,29 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
         widget.lesson['attachmentUrl']?.toString() ??
         '';
     final attachments = (widget.lesson['attachments'] as List?) ?? [];
-    final quiz = widget.lesson['quiz'] as Map<String, dynamic>?;
+    
+    final rawQuiz = widget.lesson['quiz'] ?? widget.lesson['exam'];
+    Map<String, dynamic>? resolvedQuiz;
+    if (rawQuiz is Map) {
+      resolvedQuiz = Map<String, dynamic>.from(rawQuiz);
+    } else if (widget.lesson['quizId'] != null || widget.lesson['examId'] != null) {
+      resolvedQuiz = {
+        'id': (widget.lesson['quizId'] ?? widget.lesson['examId']).toString(),
+        'title': widget.lesson['quizTitle']?.toString() ?? 'كويز المحاضرة التفاعلي',
+      };
+    } else {
+      final exams = ref.watch(liveStudentExamsProvider).value ?? [];
+      final lessonId = widget.lesson['id']?.toString() ?? '';
+      final lessonTitle = widget.lesson['title']?.toString() ?? '';
+      final found = exams.firstWhere(
+        (e) => (lessonId.isNotEmpty && e['lessonId']?.toString() == lessonId) ||
+               (lessonTitle.isNotEmpty && e['title']?.toString().contains(lessonTitle) == true),
+        orElse: () => <String, dynamic>{},
+      );
+      if (found.isNotEmpty) {
+        resolvedQuiz = found;
+      }
+    }
 
     final isVideoAvailable = (_youtubeId != null && _youtubeId!.isNotEmpty) ||
         (_resolvedVideoUrl != null && _resolvedVideoUrl!.isNotEmpty);
@@ -425,7 +520,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
             const Divider(height: 1),
 
             // 3. Lesson Quiz Action
-            if (quiz != null)
+            if (resolvedQuiz != null)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Container(
@@ -434,8 +529,16 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: branding.primaryColor.withOpacity(0.3),
+                      color: branding.primaryColor.withOpacity(0.35),
+                      width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: branding.primaryColor.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -453,7 +556,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              quiz['title']?.toString() ?? 'كويز الحصة',
+                              resolvedQuiz['title']?.toString() ?? 'كويز الحصة التفاعلي',
                               style: GoogleFonts.cairo(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.bold,
@@ -461,8 +564,8 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                               ),
                             ),
                             Text(
-                              'اختبر فهمك للشرح الآن',
-                              style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
+                              'مبني بمحرك الامتحانات الشاملة (توقيت وتصحيح فوري) 🎯',
+                              style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -473,8 +576,8 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => ExamRoomScreen(
-                                examId: quiz['id']?.toString() ?? '',
-                                examTitle: quiz['title']?.toString() ?? 'اختبار الحصة',
+                                examId: resolvedQuiz!['id']?.toString() ?? '',
+                                examTitle: resolvedQuiz['title']?.toString() ?? 'كويز الحصة',
                               ),
                             ),
                           );
@@ -526,6 +629,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                       ),
                     ),
                     child: ListTile(
+                      onTap: () => _handleOpenFile(context, pdfUrl, 'مذكرة الحصة الشاملة'),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -538,18 +642,19 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                         'مذكرة الحصة الشاملة (PDF)',
                         style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text(
-                        'اضغط للتحميل والمطالعة',
-                        style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
+                      subtitle: Row(
+                        children: [
+                          Icon(LucideIcons.zap, size: 11, color: Colors.amber[700]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'تنزيل ومطالعة سريعة (Cloudflare R2 ⚡)',
+                            style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey),
+                          ),
+                        ],
                       ),
                       trailing: IconButton(
                         icon: const Icon(LucideIcons.download, size: 20, color: Colors.redAccent),
-                        onPressed: () async {
-                          final uri = Uri.tryParse(pdfUrl);
-                          if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
+                        onPressed: () => _handleOpenFile(context, pdfUrl, 'مذكرة الحصة الشاملة'),
                       ),
                     ),
                   ),
@@ -562,7 +667,16 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                   child: Card(
+                    elevation: 0,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.black.withOpacity(0.06),
+                      ),
+                    ),
                     child: ListTile(
+                      onTap: () => _handleOpenFile(context, fileUrl, attTitle),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -575,14 +689,13 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                         attTitle,
                         style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
+                      subtitle: Text(
+                        'اضغط للتحميل المباشر',
+                        style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey),
+                      ),
                       trailing: IconButton(
-                        icon: const Icon(LucideIcons.download, size: 18),
-                        onPressed: () async {
-                          final uri = Uri.tryParse(fileUrl);
-                          if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
+                        icon: const Icon(LucideIcons.download, size: 18, color: Colors.blue),
+                        onPressed: () => _handleOpenFile(context, fileUrl, attTitle),
                       ),
                     ),
                   ),

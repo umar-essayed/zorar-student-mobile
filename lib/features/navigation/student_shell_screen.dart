@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core/services/security_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
 import '../dashboard/student_dashboard_screen.dart';
@@ -20,6 +21,12 @@ class StudentShellScreen extends ConsumerStatefulWidget {
 
 class _StudentShellScreenState extends ConsumerState<StudentShellScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    SecurityService.requestNotificationPermission();
+  }
 
   void _onSelectTab(int index) {
     setState(() {

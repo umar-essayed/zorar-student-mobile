@@ -24,6 +24,18 @@ class GroupAnalyticsScreen extends ConsumerStatefulWidget {
 class _GroupAnalyticsScreenState extends ConsumerState<GroupAnalyticsScreen> {
   String _selectedFilter = 'الكل'; // 'الكل', 'آخر شهر', 'آخر 4 أسابيع'
 
+  String _maskStudentName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.length <= 2) return fullName;
+    final firstTwo = parts.take(2).join(' ');
+    final maskedRemaining = parts.skip(2).map((p) {
+      if (p.isEmpty) return '';
+      final firstLetter = p[0];
+      return '$firstLetter***';
+    }).join(' ');
+    return '$firstTwo $maskedRemaining';
+  }
+
   @override
   Widget build(BuildContext context) {
     final branding = ref.watch(brandingProvider);
@@ -156,7 +168,7 @@ class _GroupAnalyticsScreenState extends ConsumerState<GroupAnalyticsScreen> {
                             Icon(LucideIcons.trendingUp, size: 20, color: branding.primaryColor),
                             const SizedBox(width: 8),
                             Text(
-                              'منحنى تقدمي الأسبوعي 📈',
+                              'تقدم',
                               style: GoogleFonts.cairo(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -374,14 +386,18 @@ class _GroupAnalyticsScreenState extends ConsumerState<GroupAnalyticsScreen> {
                         Expanded(
                           child: Row(
                             children: [
-                              Text(
-                                name,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 13.5,
-                                  fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
-                                  color: isMe
-                                      ? branding.primaryColor
-                                      : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                              Flexible(
+                                child: Text(
+                                  isMe ? name : _maskStudentName(name),
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 13.5,
+                                    fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
+                                    color: isMe
+                                        ? branding.primaryColor
+                                        : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (isMe) ...[

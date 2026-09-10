@@ -89,7 +89,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _buildStatsGrid(profileAsync, examsAsync, branding, isDark),
+                  child: _buildStatsGrid(profileAsync, examsAsync, branding, isDark, isOffline: isOffline),
                 ),
               ),
 
@@ -413,8 +413,9 @@ class StudentDashboardScreen extends ConsumerWidget {
     AsyncValue<Map<String, dynamic>?> profileAsync,
     AsyncValue<List<Map<String, dynamic>>> examsAsync,
     BrandingState branding,
-    bool isDark,
-  ) {
+    bool isDark, {
+    bool isOffline = false,
+  }) {
     return profileAsync.when(
       loading: () => const Center(child: LinearProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),
@@ -425,7 +426,10 @@ class StudentDashboardScreen extends ConsumerWidget {
 
         final rankSummary = profile?['rankSummary'] as Map?;
         final points = profile?['points'] ?? 0;
-        final rankLabel = rankSummary?['rankLabel']?.toString() ?? 'المركز 1 على الدفعة 🏆';
+        final rankNum = rankSummary?['rank'];
+        final rankLabel = (isOffline || rankSummary == null || rankNum == null || rankNum == 0)
+            ? 'المركز 0 على الدفعة'
+            : (rankSummary['rankLabel']?.toString() ?? 'المركز 0 على الدفعة');
 
         return Column(
           children: [
