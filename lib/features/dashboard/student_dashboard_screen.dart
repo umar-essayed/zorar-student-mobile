@@ -9,6 +9,7 @@ import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
 import '../id_card/student_id_card_screen.dart';
 import '../exams/student_exams_screen.dart';
+import '../profile/student_profile_screen.dart';
 
 class StudentDashboardScreen extends ConsumerWidget {
   final Function(int)? onNavigateTab;
@@ -158,63 +159,77 @@ class StudentDashboardScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Center Avatar / Student Avatar
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: branding.accentColor.withValues(alpha: 0.15),
-            backgroundImage: branding.logoUrl != null && branding.logoUrl!.isNotEmpty
-                ? NetworkImage(branding.logoUrl!)
-                : null,
-            child: branding.logoUrl == null || branding.logoUrl!.isEmpty
-                ? Icon(LucideIcons.user, color: branding.accentColor, size: 28)
-                : null,
-          ),
-          const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  auth.studentName.isNotEmpty ? auth.studentName : 'أهلاً بك يا بطل 🎓',
-                  style: GoogleFonts.cairo(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: StudentTheme.textPrimary,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StudentProfileScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: branding.accentColor.withValues(alpha: 0.15),
+                    backgroundImage: branding.logoUrl != null && branding.logoUrl!.isNotEmpty
+                        ? NetworkImage(branding.logoUrl!)
+                        : null,
+                    child: branding.logoUrl == null || branding.logoUrl!.isEmpty
+                        ? Icon(LucideIcons.user, color: branding.accentColor, size: 28)
+                        : null,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: StudentTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'كود: ${auth.studentCode}',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: branding.accentColor,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.studentName.isNotEmpty ? auth.studentName : 'أهلاً بك يا بطل 🎓',
+                          style: GoogleFonts.cairo(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: StudentTheme.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: StudentTheme.surfaceLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'كود: ${auth.studentCode}',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: branding.accentColor,
+                                ),
+                              ),
+                            ),
+                            if (auth.academicYear.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                auth.academicYear,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  color: StudentTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
-                    if (auth.academicYear.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        auth.academicYear,
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          color: StudentTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
           // Logout or Theme button

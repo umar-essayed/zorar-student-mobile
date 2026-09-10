@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/student_data_providers.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
+import 'lesson_player_screen.dart';
 
 class StudentCoursesScreen extends ConsumerWidget {
   const StudentCoursesScreen({super.key});
@@ -280,17 +281,23 @@ class StudentCoursesScreen extends ConsumerWidget {
                                   lTitle,
                                   style: GoogleFonts.cairo(fontSize: 13, color: StudentTheme.textPrimary),
                                 ),
-                                trailing: videoUrl != null && videoUrl.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(LucideIcons.externalLink, size: 16, color: Colors.white70),
-                                        onPressed: () async {
-                                          final uri = Uri.tryParse(videoUrl);
-                                          if (uri != null && await canLaunchUrl(uri)) {
-                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                          }
-                                        },
-                                      )
-                                    : null,
+                                subtitle: Text(
+                                  'اضغط للمشاهدة في المشغل المحمي 🔒',
+                                  style: GoogleFonts.cairo(fontSize: 10, color: StudentTheme.textSecondary),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LessonPlayerScreen(
+                                        lesson: Map<String, dynamic>.from(l),
+                                        courseTitle: course['title']?.toString() ?? '',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                trailing: const Icon(LucideIcons.chevronLeft, size: 16, color: Colors.white70),
                               );
                             }).toList(),
                           );
