@@ -43,6 +43,7 @@ class StudentAuthState {
   String get tenantId => tenant?['id']?.toString() ?? student?['tenantId']?.toString() ?? '';
   String get academicYearName => student?['academicYear']?['name']?.toString() ?? 'المرحلة الدراسية';
   String get academicYear => academicYearName;
+  String get studentPhone => student?['phone']?.toString() ?? '';
   List<dynamic> get enrolledGroups => (student?['groups'] is List) ? (student!['groups'] as List) : [];
 }
 
