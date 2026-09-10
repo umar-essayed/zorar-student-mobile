@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/student_data_providers.dart';
+import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
 import 'lesson_player_screen.dart';
@@ -16,29 +16,27 @@ class StudentCoursesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final branding = ref.watch(brandingProvider);
     final coursesAsync = ref.watch(liveStudentCoursesProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'الكورسات والمحاضرات الرقمية',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+          'المحاضرات الرقمية والكورسات',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        backgroundColor: StudentTheme.surfaceCard,
-        elevation: 0,
-        centerTitle: true,
       ),
       body: coursesAsync.when(
-        loading: () => Center(child: CircularProgressIndicator(color: branding.accentColor)),
+        loading: () => Center(child: CircularProgressIndicator(color: branding.primaryColor)),
         error: (err, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(LucideIcons.videoOff, color: Colors.redAccent, size: 48),
+              const Icon(LucideIcons.videoOff, color: Colors.orange, size: 40),
               const SizedBox(height: 12),
               Text(
-                'تعذر تحميل الكورسات',
-                style: GoogleFonts.cairo(color: StudentTheme.textPrimary, fontSize: 16),
+                'تعذر تحميل الكورسات والمحاضرات',
+                style: GoogleFonts.cairo(fontSize: 15),
               ),
               const SizedBox(height: 8),
               ElevatedButton(
@@ -54,23 +52,20 @@ class StudentCoursesScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(LucideIcons.film, color: StudentTheme.textMuted, size: 56),
-                  const SizedBox(height: 16),
+                  Icon(LucideIcons.film, color: Colors.grey[400], size: 54),
+                  const SizedBox(height: 14),
                   Text(
                     'لا توجد محاضرات رقمية متاحة حالياً',
                     style: GoogleFonts.cairo(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: StudentTheme.textPrimary,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'عند قيام المعلم بنشر دروس جديدة ستظهر هنا مباشرة',
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      color: StudentTheme.textSecondary,
-                    ),
+                    'ستظهر المحاضرات والدروس هنا فور نشرها من قبل المعلم',
+                    style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -97,9 +92,11 @@ class StudentCoursesScreen extends ConsumerWidget {
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: StudentTheme.surfaceCard,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: StudentTheme.borderDark),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,10 +106,10 @@ class StudentCoursesScreen extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: branding.accentColor.withValues(alpha: 0.15),
+                            color: branding.primaryColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(LucideIcons.playCircle, color: branding.accentColor, size: 24),
+                          child: Icon(LucideIcons.playCircle, color: branding.primaryColor, size: 24),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -122,18 +119,22 @@ class StudentCoursesScreen extends ConsumerWidget {
                               Text(
                                 title,
                                 style: GoogleFonts.cairo(
-                                  fontSize: 15,
+                                  fontSize: 14.5,
                                   fontWeight: FontWeight.bold,
-                                  color: StudentTheme.textPrimary,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               if (teacher.isNotEmpty || subject.isNotEmpty)
                                 Text(
                                   [if (subject.isNotEmpty) subject, if (teacher.isNotEmpty) 'أستاذ: $teacher'].join(' • '),
                                   style: GoogleFonts.cairo(
-                                    fontSize: 12,
-                                    color: StudentTheme.textSecondary,
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                             ],
                           ),
@@ -141,12 +142,12 @@ class StudentCoursesScreen extends ConsumerWidget {
                       ],
                     ),
                     if (desc.isNotEmpty) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
                         desc,
                         style: GoogleFonts.cairo(
                           fontSize: 12,
-                          color: StudentTheme.textMuted,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -159,18 +160,19 @@ class StudentCoursesScreen extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: StudentTheme.surfaceLight,
+                            color: isDark ? const Color(0xFF131C31) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
                             children: [
-                              const Icon(LucideIcons.layers, size: 12, color: StudentTheme.textSecondary),
+                              Icon(LucideIcons.layers, size: 12, color: branding.primaryColor),
                               const SizedBox(width: 4),
                               Text(
                                 '$lessonsCount درس تعليمي',
                                 style: GoogleFonts.cairo(
                                   fontSize: 11,
-                                  color: StudentTheme.textSecondary,
+                                  color: isDark ? Colors.grey[300] : const Color(0xFF334155),
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -178,7 +180,8 @@ class StudentCoursesScreen extends ConsumerWidget {
                         ),
                         ElevatedButton.icon(
                           onPressed: () {
-                            _showChaptersBottomSheet(context, c, branding);
+                            SoundService.lightImpact();
+                            _showChaptersBottomSheet(context, c, branding, isDark);
                           },
                           icon: const Icon(LucideIcons.eye, size: 14),
                           label: Text(
@@ -186,8 +189,8 @@ class StudentCoursesScreen extends ConsumerWidget {
                             style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: branding.accentColor,
-                            foregroundColor: Colors.black,
+                            backgroundColor: branding.primaryColor,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
@@ -208,12 +211,13 @@ class StudentCoursesScreen extends ConsumerWidget {
     BuildContext context,
     Map<String, dynamic> course,
     BrandingState branding,
+    bool isDark,
   ) {
     final chapters = (course['chapters'] as List?) ?? [];
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: StudentTheme.surfaceCard,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -226,27 +230,31 @@ class StudentCoursesScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    course['title']?.toString() ?? 'فصول الكورس',
-                    style: GoogleFonts.cairo(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: StudentTheme.textPrimary,
+                  Expanded(
+                    child: Text(
+                      course['title']?.toString() ?? 'فصول الكورس',
+                      style: GoogleFonts.cairo(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(LucideIcons.x, color: StudentTheme.textMuted),
+                    icon: const Icon(LucideIcons.x, size: 18),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
-              const Divider(color: StudentTheme.borderDark),
+              const Divider(height: 16),
               Expanded(
                 child: chapters.isEmpty
                     ? Center(
                         child: Text(
                           'لا توجد فصول مضافة بعد لهذا الكورس',
-                          style: GoogleFonts.cairo(color: StudentTheme.textSecondary),
+                          style: GoogleFonts.cairo(color: Colors.grey),
                         ),
                       )
                     : ListView.builder(
@@ -257,33 +265,46 @@ class StudentCoursesScreen extends ConsumerWidget {
                           final lessons = (ch['lessons'] as List?) ?? [];
 
                           return ExpansionTile(
-                            leading: Icon(LucideIcons.folder, color: branding.accentColor, size: 20),
+                            leading: Icon(LucideIcons.folder, color: branding.primaryColor, size: 20),
                             title: Text(
                               chTitle,
                               style: GoogleFonts.cairo(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: StudentTheme.textPrimary,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
                               '${lessons.length} دروس',
-                              style: GoogleFonts.cairo(fontSize: 11, color: StudentTheme.textSecondary),
+                              style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
                             ),
                             children: lessons.map<Widget>((l) {
                               final lTitle = l['title']?.toString() ?? 'درس';
-                              final videoUrl = l['videoUrl']?.toString();
 
                               return ListTile(
                                 dense: true,
-                                leading: const Icon(LucideIcons.play, color: Colors.blueAccent, size: 16),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: branding.primaryColor.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(LucideIcons.play, color: branding.primaryColor, size: 14),
+                                ),
                                 title: Text(
                                   lTitle,
-                                  style: GoogleFonts.cairo(fontSize: 13, color: StudentTheme.textPrimary),
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 13,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(
                                   'اضغط للمشاهدة في المشغل المحمي 🔒',
-                                  style: GoogleFonts.cairo(fontSize: 10, color: StudentTheme.textSecondary),
+                                  style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey),
                                 ),
                                 onTap: () {
                                   Navigator.pop(ctx);
@@ -297,7 +318,7 @@ class StudentCoursesScreen extends ConsumerWidget {
                                     ),
                                   );
                                 },
-                                trailing: const Icon(LucideIcons.chevronLeft, size: 16, color: Colors.white70),
+                                trailing: const Icon(LucideIcons.chevronLeft, size: 16),
                               );
                             }).toList(),
                           );

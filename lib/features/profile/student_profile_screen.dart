@@ -8,8 +8,8 @@ import '../../core/providers/student_auth_provider.dart';
 import '../../core/providers/student_data_providers.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
-import '../../core/theme/student_theme.dart';
 import '../id_card/student_id_card_screen.dart';
+import '../schedule/student_schedule_screen.dart';
 
 class StudentProfileScreen extends ConsumerWidget {
   const StudentProfileScreen({super.key});
@@ -19,23 +19,20 @@ class StudentProfileScreen extends ConsumerWidget {
     final branding = ref.watch(brandingProvider);
     final auth = ref.watch(studentAuthProvider);
     final profileAsync = ref.watch(liveStudentProfileProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final student = profileAsync.value ?? auth.student ?? {};
     final phone = student['phone']?.toString() ?? '';
     final guardianPhone = student['guardianPhone']?.toString() ?? '';
     final schoolName = student['schoolName']?.toString() ?? '';
-    final walletBalance = student['walletBalance'] ?? 0;
 
     return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'الملف الشخصي والإعدادات',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        backgroundColor: StudentTheme.surfaceCard,
-        elevation: 0,
-        centerTitle: true,
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -44,38 +41,42 @@ class StudentProfileScreen extends ConsumerWidget {
           children: [
             // 1. Avatar & Basic Info Card
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: StudentTheme.surfaceCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: StudentTheme.borderDark),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Column(
                 children: [
                   CircleAvatar(
-                    radius: 36,
-                    backgroundColor: branding.accentColor.withValues(alpha: 0.2),
+                    radius: 34,
+                    backgroundColor: branding.primaryColor.withOpacity(0.12),
                     backgroundImage: branding.logoUrl != null && branding.logoUrl!.isNotEmpty
                         ? NetworkImage(branding.logoUrl!)
                         : null,
                     child: branding.logoUrl == null || branding.logoUrl!.isEmpty
-                        ? Icon(LucideIcons.userCheck, color: branding.accentColor, size: 36)
+                        ? Icon(LucideIcons.user, color: branding.primaryColor, size: 32)
                         : null,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Text(
                     auth.studentName,
                     style: GoogleFonts.cairo(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: StudentTheme.textPrimary,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
                     decoration: BoxDecoration(
-                      color: branding.accentColor.withValues(alpha: 0.15),
+                      color: branding.primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -83,32 +84,34 @@ class StudentProfileScreen extends ConsumerWidget {
                       style: GoogleFonts.cairo(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: branding.accentColor,
+                        color: branding.primaryColor,
                       ),
                     ),
                   ),
                   if (auth.academicYear.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       auth.academicYear,
                       style: GoogleFonts.cairo(
-                        fontSize: 13,
-                        color: StudentTheme.textSecondary,
+                        fontSize: 12,
+                        color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // 2. Center & Platform Status
+            // 2. Personal & Center Info
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: StudentTheme.surfaceCard,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: StudentTheme.borderDark),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Column(
                 children: [
@@ -116,124 +119,177 @@ class StudentProfileScreen extends ConsumerWidget {
                     icon: LucideIcons.building,
                     label: 'السنتر التابع له',
                     value: branding.centerName,
-                    iconColor: branding.accentColor,
+                    iconColor: branding.primaryColor,
+                    isDark: isDark,
                   ),
-                  const Divider(color: StudentTheme.borderDark, height: 20),
+                  const Divider(height: 18),
                   _buildDetailRow(
                     icon: LucideIcons.phone,
-                    label: 'رقم هاتف الطالب',
+                    label: 'هاتف الطالب',
                     value: phone.isNotEmpty ? phone : 'غير مسجل',
-                    iconColor: Colors.blueAccent,
+                    iconColor: Colors.blue,
+                    isDark: isDark,
                   ),
-                  const Divider(color: StudentTheme.borderDark, height: 20),
+                  const Divider(height: 18),
                   _buildDetailRow(
-                    icon: LucideIcons.userPlus,
+                    icon: LucideIcons.userCheck,
                     label: 'هاتف ولي الأمر',
                     value: guardianPhone.isNotEmpty ? guardianPhone : 'غير مسجل',
-                    iconColor: Colors.tealAccent,
+                    iconColor: Colors.teal,
+                    isDark: isDark,
                   ),
                   if (schoolName.isNotEmpty) ...[
-                    const Divider(color: StudentTheme.borderDark, height: 20),
+                    const Divider(height: 18),
                     _buildDetailRow(
                       icon: LucideIcons.school,
                       label: 'المدرسة',
                       value: schoolName,
-                      iconColor: Colors.amber,
+                      iconColor: Colors.amber[800]!,
+                      isDark: isDark,
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // 3. Digital ID Card Direct Action
-            InkWell(
-              onTap: () {
-                SoundService.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StudentIdCardScreen()),
-                );
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: StudentTheme.surfaceCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: branding.accentColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
+            // 3. Quick Links (ID Card & Timetable)
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      SoundService.lightImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentIdCardScreen()));
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       decoration: BoxDecoration(
-                        color: branding.accentColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                        ),
                       ),
-                      child: Icon(LucideIcons.qrCode, color: branding.accentColor, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            'عرض كارت الطالب الرقمي (ID)',
-                            style: GoogleFonts.cairo(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: StudentTheme.textPrimary,
+                          Icon(LucideIcons.barcode, color: branding.primaryColor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'كارت الحضور',
+                              style: GoogleFonts.cairo(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          Text(
-                            'الباركود الذكي لتسجيل الحضور ببوابات السنتر',
-                            style: GoogleFonts.cairo(fontSize: 11, color: StudentTheme.textSecondary),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(LucideIcons.chevronLeft, color: Colors.white70, size: 18),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      SoundService.lightImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentScheduleScreen()));
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.calendarDays, color: Colors.purpleAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'جدول الحصص',
+                              style: GoogleFonts.cairo(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // 4. System Settings & Toggles
+            // 4. System Settings (Dark Mode & WhatsApp Support)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: StudentTheme.surfaceCard,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: StudentTheme.borderDark),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'إعدادات التطبيق',
+                    'الإعدادات والتفضيلات',
                     style: GoogleFonts.cairo(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: StudentTheme.textPrimary,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      'الوضع الليلي الداكن (Dark Mode)',
-                      style: GoogleFonts.cairo(fontSize: 13, color: StudentTheme.textPrimary),
+                      'الوضع الليلي (Dark Mode)',
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
                     subtitle: Text(
-                      'مريح للعين وموفر لاستهلاك البطارية',
-                      style: GoogleFonts.cairo(fontSize: 11, color: StudentTheme.textSecondary),
+                      'مريح للعين وموفر للبطارية',
+                      style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
                     ),
                     value: branding.isDarkMode,
-                    activeColor: branding.accentColor,
+                    activeColor: branding.primaryColor,
                     onChanged: (val) {
                       ref.read(brandingProvider.notifier).toggleDarkMode();
+                    },
+                  ),
+                  const Divider(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(LucideIcons.messageCircle, color: Color(0xFF10B981), size: 20),
+                    title: Text(
+                      'الدعم الفني للسنتر عبر واتساب',
+                      style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    trailing: const Icon(LucideIcons.chevronLeft, size: 16),
+                    onTap: () async {
+                      final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent("مرحبا، أود الاستفسار بخصوص حساب الطالب ${auth.studentName} كود ${auth.studentCode}")}');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
                     },
                   ),
                 ],
@@ -244,19 +300,18 @@ class StudentProfileScreen extends ConsumerWidget {
             // 5. Secure Logout Button
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: OutlinedButton.icon(
                 onPressed: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      backgroundColor: StudentTheme.surfaceCard,
                       title: Text('تسجيل الخروج', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                      content: Text('هل ترغب حقاً في تسجيل الخروج من حساب الطالب؟', style: GoogleFonts.cairo()),
+                      content: Text('هل أنت متأكد من رغبتك في تسجيل الخروج من هذا الجهاز؟', style: GoogleFonts.cairo()),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: Text('إلغاء', style: GoogleFonts.cairo(color: StudentTheme.textMuted)),
+                          child: Text('إلغاء', style: GoogleFonts.cairo()),
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
@@ -270,11 +325,11 @@ class StudentProfileScreen extends ConsumerWidget {
                     ref.read(studentAuthProvider.notifier).logout();
                   }
                 },
-                icon: const Icon(LucideIcons.logOut, color: Colors.redAccent, size: 18),
+                icon: const Icon(LucideIcons.logOut, color: Colors.redAccent, size: 16),
                 label: Text(
                   'تسجيل الخروج من الحساب',
                   style: GoogleFonts.cairo(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.bold,
                     color: Colors.redAccent,
                   ),
@@ -297,33 +352,36 @@ class StudentProfileScreen extends ConsumerWidget {
     required String label,
     required String value,
     required Color iconColor,
+    required bool isDark,
   }) {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
+            color: iconColor.withOpacity(0.12),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: iconColor, size: 18),
+          child: Icon(icon, color: iconColor, size: 16),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: GoogleFonts.cairo(fontSize: 11, color: StudentTheme.textSecondary),
+                style: GoogleFonts.cairo(fontSize: 11, color: isDark ? Colors.grey[400] : const Color(0xFF64748B)),
               ),
               Text(
                 value,
                 style: GoogleFonts.cairo(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: StudentTheme.textPrimary,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

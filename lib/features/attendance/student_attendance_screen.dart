@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/student_auth_provider.dart';
 import '../../core/providers/student_data_providers.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
+import '../../core/utils/group_utils.dart';
 
 class StudentAttendanceGradesScreen extends ConsumerStatefulWidget {
   const StudentAttendanceGradesScreen({super.key});
@@ -42,20 +42,18 @@ class _StudentAttendanceGradesScreenState
     final branding = ref.watch(brandingProvider);
     final profileAsync = ref.watch(liveStudentProfileProvider);
     final groups = ref.watch(liveStudentGroupsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'سجل الحضور والتقييمات',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        backgroundColor: StudentTheme.surfaceCard,
-        elevation: 0,
-        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.share2, color: Colors.white70, size: 20),
+            icon: const Icon(LucideIcons.share2, size: 18),
             tooltip: 'مشاركة التقرير عبر واتساب',
             onPressed: () async {
               final auth = ref.read(studentAuthProvider);
@@ -69,10 +67,8 @@ class _StudentAttendanceGradesScreenState
                   'اسم الطالب: ${auth.studentName}\n'
                   'كود الطالب: ${auth.studentCode}\n'
                   'المرحلة: ${auth.academicYear}\n'
-                  'عدد الحصص الكلية: ${attList.length}\n'
-                  'مرات الحضور: $presentCount\n'
-                  'مرات الغياب: $absentCount\n'
-                  'نتمنى له دوام التفوق والنجاح 🌟';
+                  'عدد الحصص: ${attList.length} (حضور: $presentCount - غياب: $absentCount)\n'
+                  'مع تحيات إدارة السنتر 🌟';
 
               final url = guardianPhone.isNotEmpty
                   ? 'https://wa.me/2$guardianPhone?text=${Uri.encodeComponent(reportText)}'
@@ -87,34 +83,34 @@ class _StudentAttendanceGradesScreenState
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: branding.accentColor,
-          labelColor: branding.accentColor,
-          unselectedLabelColor: StudentTheme.textSecondary,
-          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14),
-          unselectedLabelStyle: GoogleFonts.cairo(fontSize: 14),
+          indicatorColor: branding.primaryColor,
+          labelColor: branding.primaryColor,
+          unselectedLabelColor: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13.5),
+          unselectedLabelStyle: GoogleFonts.cairo(fontSize: 13.5),
           tabs: const [
             Tab(
-              icon: Icon(LucideIcons.calendarCheck, size: 18),
+              icon: Icon(LucideIcons.calendarCheck, size: 16),
               text: 'سجل الحضور والغياب',
             ),
             Tab(
-              icon: Icon(LucideIcons.award, size: 18),
-              text: 'الدرجات والتقييمات',
+              icon: Icon(LucideIcons.award, size: 16),
+              text: 'الدرجات والكويزات',
             ),
           ],
         ),
       ),
       body: profileAsync.when(
-        loading: () => Center(child: CircularProgressIndicator(color: branding.accentColor)),
+        loading: () => Center(child: CircularProgressIndicator(color: branding.primaryColor)),
         error: (err, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(LucideIcons.alertCircle, color: Colors.redAccent, size: 40),
-              const SizedBox(height: 12),
+              const Icon(LucideIcons.alertCircle, color: Colors.orange, size: 36),
+              const SizedBox(height: 10),
               Text(
                 'تعذر تحميل السجلات',
-                style: GoogleFonts.cairo(color: StudentTheme.textPrimary, fontSize: 16),
+                style: GoogleFonts.cairo(fontSize: 15),
               ),
               const SizedBox(height: 8),
               ElevatedButton(
@@ -128,7 +124,6 @@ class _StudentAttendanceGradesScreenState
           final allAttendances = (profile?['attendances'] as List?) ?? [];
           final allAssessments = (profile?['assessments'] as List?) ?? [];
 
-          // Filter by group if selected
           final attendances = _selectedGroupId == null
               ? allAttendances
               : allAttendances.where((a) => a['groupId'] == _selectedGroupId).toList();
@@ -143,14 +138,14 @@ class _StudentAttendanceGradesScreenState
               if (groups.length > 1)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: StudentTheme.surfaceCard,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   child: Row(
                     children: [
                       Text(
                         'المجموعة:',
                         style: GoogleFonts.cairo(
                           fontSize: 12,
-                          color: StudentTheme.textSecondary,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -166,18 +161,14 @@ class _StudentAttendanceGradesScreenState
                                 onSelected: (sel) {
                                   if (sel) setState(() => _selectedGroupId = null);
                                 },
-                                selectedColor: branding.accentColor.withValues(alpha: 0.2),
-                                labelStyle: TextStyle(
-                                  color: _selectedGroupId == null
-                                      ? branding.accentColor
-                                      : StudentTheme.textSecondary,
-                                ),
+                                selectedColor: branding.primaryColor.withOpacity(0.15),
                               ),
                               const SizedBox(width: 6),
                               ...groups.map((g) {
-                                final gid = g['id']?.toString() ?? '';
-                                final gname = g['name']?.toString() ?? 'مجموعة';
+                                final gid = g['id']?.toString() ?? g['groupId']?.toString() ?? '';
+                                final gname = GroupUtils.getName(g);
                                 final isSel = _selectedGroupId == gid;
+
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 6),
                                   child: ChoiceChip(
@@ -186,10 +177,7 @@ class _StudentAttendanceGradesScreenState
                                     onSelected: (sel) {
                                       setState(() => _selectedGroupId = sel ? gid : null);
                                     },
-                                    selectedColor: branding.accentColor.withValues(alpha: 0.2),
-                                    labelStyle: TextStyle(
-                                      color: isSel ? branding.accentColor : StudentTheme.textSecondary,
-                                    ),
+                                    selectedColor: branding.primaryColor.withOpacity(0.15),
                                   ),
                                 );
                               }),
@@ -201,15 +189,12 @@ class _StudentAttendanceGradesScreenState
                   ),
                 ),
 
-              // TabBar View
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    // Tab 1: Attendance History
-                    _buildAttendanceTab(attendances, branding),
-                    // Tab 2: Grades & Assessments
-                    _buildGradesTab(assessments, attendances, branding),
+                    _buildAttendanceTab(attendances, branding, isDark),
+                    _buildGradesTab(assessments, attendances, branding, isDark),
                   ],
                 ),
               ),
@@ -220,17 +205,17 @@ class _StudentAttendanceGradesScreenState
     );
   }
 
-  Widget _buildAttendanceTab(List<dynamic> attendances, BrandingState branding) {
+  Widget _buildAttendanceTab(List<dynamic> attendances, BrandingState branding, bool isDark) {
     if (attendances.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.calendarX, color: StudentTheme.textMuted, size: 48),
-            const SizedBox(height: 12),
+            Icon(LucideIcons.calendarX, color: Colors.grey[400], size: 48),
+            const SizedBox(height: 10),
             Text(
-              'لا يوجد سجل حضور حتى الآن',
-              style: GoogleFonts.cairo(color: StudentTheme.textSecondary, fontSize: 14),
+              'لا يوجد سجل حضور مسجل حتى الآن',
+              style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 13),
             ),
           ],
         ),
@@ -248,29 +233,31 @@ class _StudentAttendanceGradesScreenState
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: StudentTheme.surfaceCard,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: StudentTheme.borderDark),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildMetricBadge('إجمالي الحصص', '${attendances.length}', Colors.blueAccent),
-              _buildMetricBadge('حضور', '$presentCount', const Color(0xFF10B981)),
-              _buildMetricBadge('غياب', '$absentCount', Colors.redAccent),
+              _buildMetricBadge('إجمالي الحصص', '${attendances.length}', Colors.blue, isDark),
+              _buildMetricBadge('حضور', '$presentCount', const Color(0xFF10B981), isDark),
+              _buildMetricBadge('غياب', '$absentCount', Colors.redAccent, isDark),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
-        // Attendance List
+        // Attendance Cards List
         ...attendances.map((att) {
           final isPresent = att['status'] == 'PRESENT';
           final session = att['session'];
           final sessionTitle = session?['title']?.toString() ??
               'حصة رقم ${session?['sessionNumber'] ?? ''}';
-          final groupName = att['group']?['name']?.toString() ?? '';
-          
+          final groupName = GroupUtils.getName(att['group'] ?? att);
+
           DateTime? date;
           if (att['scannedAt'] != null) {
             date = DateTime.tryParse(att['scannedAt'].toString());
@@ -279,101 +266,91 @@ class _StudentAttendanceGradesScreenState
           }
 
           final dateStr = date != null
-              ? DateFormat('EEEE, d MMMM yyyy - hh:mm a', 'ar').format(date)
-              : 'تاريخ الحصة غير محدد';
+              ? DateFormat('EEEE, d MMM yyyy - hh:mm a', 'ar').format(date)
+              : '';
 
           return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: StudentTheme.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: StudentTheme.borderDark),
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isPresent
-                        ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                        : Colors.redAccent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                        ? const Color(0xFF10B981).withOpacity(0.12)
+                        : Colors.redAccent.withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isPresent ? LucideIcons.checkCheck : LucideIcons.xCircle,
+                    isPresent ? LucideIcons.checkCheck : LucideIcons.x,
                     color: isPresent ? const Color(0xFF10B981) : Colors.redAccent,
-                    size: 22,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              sessionTitle,
-                              style: GoogleFonts.cairo(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: StudentTheme.textPrimary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isPresent
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                                  : Colors.redAccent.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              isPresent ? 'حاضر' : 'غائب',
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isPresent ? const Color(0xFF10B981) : Colors.redAccent,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        sessionTitle,
+                        style: GoogleFonts.cairo(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (groupName.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                      if (groupName.isNotEmpty)
                         Text(
                           groupName,
                           style: GoogleFonts.cairo(
-                            fontSize: 12,
-                            color: branding.accentColor,
+                            fontSize: 11.5,
+                            color: branding.primaryColor,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      if (dateStr.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          dateStr,
+                          style: GoogleFonts.cairo(
+                            fontSize: 10.5,
+                            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(LucideIcons.clock, size: 12, color: StudentTheme.textMuted),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              dateStr,
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                color: StudentTheme.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isPresent
+                        ? const Color(0xFF10B981).withOpacity(0.12)
+                        : Colors.redAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isPresent ? 'حاضر' : 'غائب',
+                    style: GoogleFonts.cairo(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isPresent ? const Color(0xFF10B981) : Colors.redAccent,
+                    ),
                   ),
                 ),
               ],
@@ -388,8 +365,8 @@ class _StudentAttendanceGradesScreenState
     List<dynamic> assessments,
     List<dynamic> attendances,
     BrandingState branding,
+    bool isDark,
   ) {
-    // Collect assessments attached to attendances as well
     final combinedAssessments = <Map<String, dynamic>>[];
     for (final a in assessments) {
       if (a is Map<String, dynamic>) combinedAssessments.add(a);
@@ -399,7 +376,7 @@ class _StudentAttendanceGradesScreenState
         final a = Map<String, dynamic>.from(att['assessment']);
         a['sessionTitle'] = att['session']?['title'];
         a['sessionNumber'] = att['session']?['sessionNumber'];
-        a['groupName'] = att['group']?['name'];
+        a['groupName'] = GroupUtils.getName(att['group'] ?? att);
         if (!combinedAssessments.any((item) => item['id'] == a['id'])) {
           combinedAssessments.add(a);
         }
@@ -411,21 +388,22 @@ class _StudentAttendanceGradesScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.award, color: StudentTheme.textMuted, size: 48),
-            const SizedBox(height: 12),
+            Icon(LucideIcons.award, color: Colors.grey[400], size: 48),
+            const SizedBox(height: 10),
             Text(
               'لم يتم رصد درجات أو كويزات بعد',
-              style: GoogleFonts.cairo(color: StudentTheme.textSecondary, fontSize: 14),
+              style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 13),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
       physics: const BouncingScrollPhysics(),
       itemCount: combinedAssessments.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = combinedAssessments[index];
         final score = item['score'] ?? item['quizScore'] ?? 0;
@@ -434,22 +412,23 @@ class _StudentAttendanceGradesScreenState
         final notes = item['notes']?.toString() ?? '';
         final title = item['sessionTitle']?.toString() ??
             (item['sessionNumber'] != null ? 'كويز حصة ${item['sessionNumber']}' : 'تقييم دراسي');
-        final group = item['groupName']?.toString() ?? item['group']?['name']?.toString() ?? '';
+        final group = GroupUtils.getName(item['groupName'] ?? item['group'] ?? item);
 
         final ratio = maxScore > 0 ? (score / maxScore) : 0.0;
         final scoreColor = ratio >= 0.85
             ? const Color(0xFF10B981)
             : ratio >= 0.60
-                ? Colors.amber
+                ? Colors.amber[700]!
                 : Colors.redAccent;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: StudentTheme.surfaceCard,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: StudentTheme.borderDark),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,33 +443,37 @@ class _StudentAttendanceGradesScreenState
                         Text(
                           title,
                           style: GoogleFonts.cairo(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.bold,
-                            color: StudentTheme.textPrimary,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         if (group.isNotEmpty)
                           Text(
                             group,
                             style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              color: StudentTheme.textSecondary,
+                              fontSize: 11.5,
+                              color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                     decoration: BoxDecoration(
-                      color: scoreColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: scoreColor.withValues(alpha: 0.3)),
+                      color: scoreColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '$score / $maxScore',
                       style: GoogleFonts.cairo(
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                         color: scoreColor,
                       ),
@@ -498,14 +481,13 @@ class _StudentAttendanceGradesScreenState
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Linear Progress Indicator
+              const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: ratio.clamp(0.0, 1.0),
-                  minHeight: 6,
-                  backgroundColor: StudentTheme.surfaceLight,
+                  minHeight: 5,
+                  backgroundColor: isDark ? const Color(0xFF131C31) : const Color(0xFFF1F5F9),
                   valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
                 ),
               ),
@@ -513,11 +495,11 @@ class _StudentAttendanceGradesScreenState
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                     decoration: BoxDecoration(
                       color: homeworkDone
-                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                          : Colors.orangeAccent.withValues(alpha: 0.15),
+                          ? const Color(0xFF10B981).withOpacity(0.12)
+                          : Colors.orange.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
@@ -525,16 +507,16 @@ class _StudentAttendanceGradesScreenState
                       children: [
                         Icon(
                           homeworkDone ? LucideIcons.check : LucideIcons.x,
-                          size: 13,
-                          color: homeworkDone ? const Color(0xFF10B981) : Colors.orangeAccent,
+                          size: 12,
+                          color: homeworkDone ? const Color(0xFF10B981) : Colors.orange[800],
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          homeworkDone ? 'تم حل الواجب' : 'لم يسلم الواجب',
+                          homeworkDone ? 'سلم الواجب' : 'لم يسلم الواجب',
                           style: GoogleFonts.cairo(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: homeworkDone ? const Color(0xFF10B981) : Colors.orangeAccent,
+                            color: homeworkDone ? const Color(0xFF10B981) : Colors.orange[800],
                           ),
                         ),
                       ],
@@ -547,7 +529,7 @@ class _StudentAttendanceGradesScreenState
                         'ملاحظة: $notes',
                         style: GoogleFonts.cairo(
                           fontSize: 11,
-                          color: StudentTheme.textMuted,
+                          color: Colors.grey[600],
                           fontStyle: FontStyle.italic,
                         ),
                         maxLines: 1,
@@ -564,7 +546,7 @@ class _StudentAttendanceGradesScreenState
     );
   }
 
-  Widget _buildMetricBadge(String label, String value, Color color) {
+  Widget _buildMetricBadge(String label, String value, Color color, bool isDark) {
     return Column(
       children: [
         Text(
@@ -579,7 +561,7 @@ class _StudentAttendanceGradesScreenState
           label,
           style: GoogleFonts.cairo(
             fontSize: 11,
-            color: StudentTheme.textSecondary,
+            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
           ),
         ),
       ],

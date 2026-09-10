@@ -5,8 +5,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/providers/student_auth_provider.dart';
 import '../../core/providers/student_data_providers.dart';
+import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
+import '../../core/utils/group_utils.dart';
 import '../id_card/student_id_card_screen.dart';
 import '../exams/student_exams_screen.dart';
 import '../profile/student_profile_screen.dart';
@@ -23,13 +25,14 @@ class StudentDashboardScreen extends ConsumerWidget {
     final auth = ref.watch(studentAuthProvider);
     final profileAsync = ref.watch(liveStudentProfileProvider);
     final examsAsync = ref.watch(liveStudentExamsProvider);
+    final groups = ref.watch(liveStudentGroupsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: RefreshIndicator(
-          color: branding.accentColor,
-          backgroundColor: StudentTheme.surfaceCard,
+          color: branding.primaryColor,
           onRefresh: () async {
             ref.invalidate(liveStudentProfileProvider);
             ref.invalidate(liveStudentExamsProvider);
@@ -37,27 +40,27 @@ class StudentDashboardScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
-              // 1. Center Brand & Student Profile Header
+              // 1. Header (Student Profile & Center Logo)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: _buildHeader(context, ref, auth, branding),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                  child: _buildHeader(context, ref, auth, branding, isDark),
                 ),
               ),
 
-              // 2. Digital ID Card Quick Banner
+              // 2. Horizontal Barcode ID Card Banner (Direct Attendance Trigger)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _buildIdCardBanner(context, ref, auth, branding),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: _buildAttendanceCardBanner(context, ref, auth, branding),
                 ),
               ),
 
-              // 3. Overview KPI Stats Cards
+              // 3. Overview KPI Stats (Attendances, Exams, Wallet)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _buildStatsGrid(profileAsync, examsAsync, branding),
+                  child: _buildStatsGrid(profileAsync, examsAsync, branding, isDark),
                 ),
               ),
 
@@ -65,11 +68,11 @@ class StudentDashboardScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _buildQuickActions(context, onNavigateTab, branding),
+                  child: _buildQuickActions(context, onNavigateTab, branding, isDark),
                 ),
               ),
 
-              // 5. Enrolled Subjects & Groups
+              // 5. Enrolled Groups Carousel
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -77,18 +80,18 @@ class StudentDashboardScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'المجموعات الدراسية المسجلة',
+                        'مجموعاتي الدراسية',
                         style: GoogleFonts.cairo(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: StudentTheme.textPrimary,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                       Text(
-                        '${auth.enrolledGroups.length} مجموعة',
+                        '${groups.length} مجموعة',
                         style: GoogleFonts.cairo(
                           fontSize: 12,
-                          color: StudentTheme.textSecondary,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -97,32 +100,32 @@ class StudentDashboardScreen extends ConsumerWidget {
               ),
 
               SliverToBoxAdapter(
-                child: _buildGroupsList(auth, branding),
+                child: _buildGroupsList(groups, branding, isDark),
               ),
 
-              // 6. Recent Attendances & Activities
+              // 6. Recent Attendance / Activity
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'سجل الحضور والتقييمات الأخيرة',
+                        'آخر الحصص المسجلة',
                         style: GoogleFonts.cairo(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: StudentTheme.textPrimary,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                       if (onNavigateTab != null)
                         TextButton(
-                          onPressed: () => onNavigateTab!(3), // Navigate to attendance/grades tab
+                          onPressed: () => onNavigateTab!(3),
                           child: Text(
                             'عرض الكل',
                             style: GoogleFonts.cairo(
                               fontSize: 12,
-                              color: branding.accentColor,
+                              color: branding.primaryColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -135,7 +138,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  child: _buildRecentActivity(profileAsync, branding),
+                  child: _buildRecentActivity(profileAsync, branding, isDark),
                 ),
               ),
             ],
@@ -150,19 +153,23 @@ class StudentDashboardScreen extends ConsumerWidget {
     WidgetRef ref,
     StudentAuthState auth,
     BrandingState branding,
+    bool isDark,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: StudentTheme.surfaceCard,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: StudentTheme.borderDark),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
               onTap: () {
+                SoundService.lightImpact();
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const StudentProfileScreen()),
@@ -172,26 +179,26 @@ class StudentDashboardScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 26,
-                    backgroundColor: branding.accentColor.withValues(alpha: 0.15),
+                    radius: 24,
+                    backgroundColor: branding.primaryColor.withOpacity(0.12),
                     backgroundImage: branding.logoUrl != null && branding.logoUrl!.isNotEmpty
                         ? NetworkImage(branding.logoUrl!)
                         : null,
                     child: branding.logoUrl == null || branding.logoUrl!.isEmpty
-                        ? Icon(LucideIcons.user, color: branding.accentColor, size: 28)
+                        ? Icon(LucideIcons.user, color: branding.primaryColor, size: 24)
                         : null,
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          auth.studentName.isNotEmpty ? auth.studentName : 'أهلاً بك يا بطل 🎓',
+                          auth.studentName.isNotEmpty ? auth.studentName : 'أهلاً بك 🎓',
                           style: GoogleFonts.cairo(
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: StudentTheme.textPrimary,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -200,9 +207,9 @@ class StudentDashboardScreen extends ConsumerWidget {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: StudentTheme.surfaceLight,
+                                color: branding.primaryColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -210,17 +217,21 @@ class StudentDashboardScreen extends ConsumerWidget {
                                 style: GoogleFonts.cairo(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: branding.accentColor,
+                                  color: branding.primaryColor,
                                 ),
                               ),
                             ),
                             if (auth.academicYear.isNotEmpty) ...[
                               const SizedBox(width: 6),
-                              Text(
-                                auth.academicYear,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 11,
-                                  color: StudentTheme.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  auth.academicYear,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 11,
+                                    color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -233,33 +244,18 @@ class StudentDashboardScreen extends ConsumerWidget {
               ),
             ),
           ),
-          // Logout or Theme button
           IconButton(
-            icon: const Icon(LucideIcons.logOut, color: StudentTheme.textMuted, size: 20),
-            tooltip: 'تسجيل الخروج',
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: StudentTheme.surfaceCard,
-                  title: Text('تسجيل الخروج', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                  content: Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟', style: GoogleFonts.cairo()),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: Text('إلغاء', style: GoogleFonts.cairo(color: StudentTheme.textMuted)),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: Text('خروج', style: GoogleFonts.cairo(color: Colors.white)),
-                    ),
-                  ],
-                ),
+            icon: Icon(
+              LucideIcons.settings,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              size: 20,
+            ),
+            tooltip: 'الإعدادات والملف الشخصي',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StudentProfileScreen()),
               );
-              if (confirm == true) {
-                ref.read(studentAuthProvider.notifier).logout();
-              }
             },
           ),
         ],
@@ -267,7 +263,7 @@ class StudentDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildIdCardBanner(
+  Widget _buildAttendanceCardBanner(
     BuildContext context,
     WidgetRef ref,
     StudentAuthState auth,
@@ -275,6 +271,7 @@ class StudentDashboardScreen extends ConsumerWidget {
   ) {
     return InkWell(
       onTap: () {
+        SoundService.lightImpact();
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const StudentIdCardScreen()),
@@ -282,12 +279,12 @@ class StudentDashboardScreen extends ConsumerWidget {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              branding.accentColor,
-              branding.accentColor.withValues(alpha: 0.8),
+              branding.primaryColor,
+              branding.primaryColor.withOpacity(0.85),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -295,9 +292,9 @@ class StudentDashboardScreen extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: branding.accentColor.withValues(alpha: 0.25),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: branding.primaryColor.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -306,10 +303,10 @@ class StudentDashboardScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.black26,
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(LucideIcons.qrCode, color: Colors.white, size: 28),
+              child: const Icon(LucideIcons.barcode, color: Colors.white, size: 26),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -317,24 +314,24 @@ class StudentDashboardScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'بطاقة الطالب الرقمية (QR حضور)',
+                    'كارت الحضور والباركود الذكي',
                     style: GoogleFonts.cairo(
-                      fontSize: 15,
+                      fontSize: 14.5,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                   Text(
-                    'اضغط هنا لإظهار باركود تسجيل الحضور السريع',
+                    'اضغط لعرض الباركود لتسجيل الحضور بالقاعة',
                     style: GoogleFonts.cairo(
                       fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: Colors.white.withOpacity(0.85),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 20),
+            const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 18),
           ],
         ),
       ),
@@ -345,13 +342,13 @@ class StudentDashboardScreen extends ConsumerWidget {
     AsyncValue<Map<String, dynamic>?> profileAsync,
     AsyncValue<List<Map<String, dynamic>>> examsAsync,
     BrandingState branding,
+    bool isDark,
   ) {
     return profileAsync.when(
       loading: () => const Center(child: LinearProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),
       data: (profile) {
         final attendances = (profile?['attendances'] as List?)?.length ?? 0;
-        final assessments = (profile?['assessments'] as List?)?.length ?? 0;
         final availableExams = examsAsync.value?.length ?? 0;
         final walletBalance = profile?['financialSummary']?['walletBalance'] ?? 0;
 
@@ -360,27 +357,33 @@ class StudentDashboardScreen extends ConsumerWidget {
             Expanded(
               child: _buildStatItem(
                 label: 'مرات الحضور',
-                value: '$attendances حصة',
+                value: '$attendances',
+                unit: 'حصة',
                 icon: LucideIcons.calendarCheck,
                 color: const Color(0xFF10B981),
+                isDark: isDark,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildStatItem(
                 label: 'امتحانات متاحة',
-                value: '$availableExams امتحان',
+                value: '$availableExams',
+                unit: 'امتحان',
                 icon: LucideIcons.fileQuestion,
                 color: Colors.orangeAccent,
+                isDark: isDark,
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: _buildStatItem(
                 label: 'الرصيد / المستحق',
-                value: '${walletBalance.abs()} ج.م',
+                value: '${walletBalance.abs()}',
+                unit: 'ج.م',
                 icon: LucideIcons.wallet,
-                color: walletBalance < 0 ? Colors.redAccent : branding.accentColor,
+                color: walletBalance < 0 ? Colors.redAccent : branding.primaryColor,
+                isDark: isDark,
               ),
             ),
           ],
@@ -389,38 +392,52 @@ class StudentDashboardScreen extends ConsumerWidget {
     );
   }
 
-  static Color get _emerald => const Color(0xFF10B981);
-
   Widget _buildStatItem({
     required String label,
     required String value,
+    required String unit,
     required IconData icon,
     required Color color,
+    required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: StudentTheme.surfaceCard,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: StudentTheme.borderDark),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: GoogleFonts.cairo(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: StudentTheme.textPrimary,
-            ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.cairo(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                unit,
+                style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey),
+              ),
+            ],
           ),
           Text(
             label,
             style: GoogleFonts.cairo(
-              fontSize: 10,
-              color: StudentTheme.textSecondary,
+              fontSize: 10.5,
+              color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
             ),
             textAlign: TextAlign.center,
           ),
@@ -433,13 +450,16 @@ class StudentDashboardScreen extends ConsumerWidget {
     BuildContext context,
     Function(int)? onNavigateTab,
     BrandingState branding,
+    bool isDark,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: StudentTheme.surfaceCard,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: StudentTheme.borderDark),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -447,15 +467,13 @@ class StudentDashboardScreen extends ConsumerWidget {
           _buildActionButton(
             icon: LucideIcons.fileText,
             label: 'الامتحانات',
-            color: branding.accentColor,
+            color: branding.primaryColor,
+            isDark: isDark,
             onTap: () {
               if (onNavigateTab != null) {
-                onNavigateTab(1); // Exams Tab
+                onNavigateTab(1);
               } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StudentExamsScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentExamsScreen()));
               }
             },
           ),
@@ -463,41 +481,36 @@ class StudentDashboardScreen extends ConsumerWidget {
             icon: LucideIcons.video,
             label: 'المحاضرات',
             color: Colors.blueAccent,
+            isDark: isDark,
             onTap: () {
-              if (onNavigateTab != null) {
-                onNavigateTab(2); // Courses Tab
-              }
+              if (onNavigateTab != null) onNavigateTab(2);
             },
           ),
           _buildActionButton(
             icon: LucideIcons.calendarDays,
             label: 'جدول الحصص',
             color: Colors.purpleAccent,
+            isDark: isDark,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const StudentScheduleScreen()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentScheduleScreen()));
             },
           ),
           _buildActionButton(
             icon: LucideIcons.award,
             label: 'الدرجات',
-            color: Colors.amber,
+            color: Colors.amber[700]!,
+            isDark: isDark,
             onTap: () {
-              if (onNavigateTab != null) {
-                onNavigateTab(3); // Attendance & Grades Tab
-              }
+              if (onNavigateTab != null) onNavigateTab(3);
             },
           ),
           _buildActionButton(
             icon: LucideIcons.receipt,
             label: 'الاشتراكات',
-            color: Colors.tealAccent,
+            color: Colors.teal,
+            isDark: isDark,
             onTap: () {
-              if (onNavigateTab != null) {
-                onNavigateTab(4); // Finance Tab
-              }
+              if (onNavigateTab != null) onNavigateTab(4);
             },
           ),
         ],
@@ -509,22 +522,26 @@ class StudentDashboardScreen extends ConsumerWidget {
     required IconData icon,
     required String label,
     required Color color,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        SoundService.lightImpact();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
+                color: color.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 22),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 6),
             Text(
@@ -532,7 +549,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               style: GoogleFonts.cairo(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: StudentTheme.textPrimary,
+                color: isDark ? Colors.white70 : const Color(0xFF334155),
               ),
             ),
           ],
@@ -541,46 +558,50 @@ class StudentDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGroupsList(StudentAuthState auth, BrandingState branding) {
-    if (auth.enrolledGroups.isEmpty) {
+  Widget _buildGroupsList(List<Map<String, dynamic>> groups, BrandingState branding, bool isDark) {
+    if (groups.isEmpty) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: StudentTheme.surfaceCard,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: StudentTheme.borderDark),
+          border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+          ),
         ),
         child: Center(
           child: Text(
             'لا توجد مجموعات دراسية مسجلة حالياً',
-            style: GoogleFonts.cairo(color: StudentTheme.textSecondary, fontSize: 13),
+            style: GoogleFonts.cairo(color: Colors.grey, fontSize: 13),
           ),
         ),
       );
     }
 
     return SizedBox(
-      height: 125,
+      height: 110,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: auth.enrolledGroups.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemCount: groups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
-          final g = auth.enrolledGroups[index];
-          final name = g['name']?.toString() ?? 'مجموعة دراسية';
-          final subject = g['subject']?['name']?.toString() ?? 'مادة تعليمية';
-          final teacher = g['teacher']?['name']?.toString() ?? '';
+          final item = groups[index];
+          final name = GroupUtils.getName(item);
+          final subject = GroupUtils.getSubject(item);
+          final teacher = GroupUtils.getTeacher(item);
 
           return Container(
-            width: 200,
-            padding: const EdgeInsets.all(14),
+            width: 190,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: StudentTheme.surfaceCard,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: StudentTheme.borderDark),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,21 +610,21 @@ class StudentDashboardScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: branding.accentColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: branding.primaryColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Icon(LucideIcons.bookOpen, color: branding.accentColor, size: 16),
+                      child: Icon(LucideIcons.bookOpen, color: branding.primaryColor, size: 14),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        subject,
+                        subject.isNotEmpty ? subject : 'مادة تعليمية',
                         style: GoogleFonts.cairo(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: StudentTheme.textPrimary,
+                          color: branding.primaryColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -616,21 +637,17 @@ class StudentDashboardScreen extends ConsumerWidget {
                   style: GoogleFonts.cairo(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: StudentTheme.textPrimary,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (teacher.isNotEmpty)
-                  Text(
-                    'أستاذ: $teacher',
-                    style: GoogleFonts.cairo(
-                      fontSize: 11,
-                      color: StudentTheme.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  teacher.isNotEmpty ? 'أستاذ: $teacher' : 'السنتر التعليمي',
+                  style: GoogleFonts.cairo(fontSize: 10.5, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           );
@@ -642,32 +659,29 @@ class StudentDashboardScreen extends ConsumerWidget {
   Widget _buildRecentActivity(
     AsyncValue<Map<String, dynamic>?> profileAsync,
     BrandingState branding,
+    bool isDark,
   ) {
     return profileAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => Center(
-        child: Text('تعذر تحميل الأنشطة الأخيرة', style: GoogleFonts.cairo(color: Colors.redAccent)),
+        child: Text('تعذر تحميل السجل', style: GoogleFonts.cairo(color: Colors.redAccent)),
       ),
       data: (profile) {
         final attendances = (profile?['attendances'] as List?) ?? [];
         if (attendances.isEmpty) {
           return Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: StudentTheme.surfaceCard,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: StudentTheme.borderDark),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Center(
-              child: Column(
-                children: [
-                  Icon(LucideIcons.calendarX, color: StudentTheme.textMuted, size: 36),
-                  const SizedBox(height: 8),
-                  Text(
-                    'لم يتم تسجيل حضور حتى الآن',
-                    style: GoogleFonts.cairo(color: StudentTheme.textSecondary, fontSize: 13),
-                  ),
-                ],
+              child: Text(
+                'لم يتم تسجيل حضور حتى الآن',
+                style: GoogleFonts.cairo(color: Colors.grey, fontSize: 13),
               ),
             ),
           );
@@ -682,7 +696,7 @@ class StudentDashboardScreen extends ConsumerWidget {
             final att = attendances[index];
             final sessionTitle = att['session']?['title']?.toString() ??
                 'حصة رقم ${att['session']?['sessionNumber'] ?? index + 1}';
-            final groupName = att['group']?['name']?.toString() ?? '';
+            final groupName = GroupUtils.getName(att['group'] ?? att);
             final status = att['status']?.toString() ?? 'PRESENT';
             final isPresent = status == 'PRESENT';
             final assessment = att['assessment'];
@@ -690,27 +704,29 @@ class StudentDashboardScreen extends ConsumerWidget {
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: StudentTheme.surfaceCard,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: StudentTheme.borderDark),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: isPresent
-                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                          : Colors.redAccent.withValues(alpha: 0.15),
+                          ? const Color(0xFF10B981).withOpacity(0.12)
+                          : Colors.redAccent.withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isPresent ? LucideIcons.check : LucideIcons.x,
                       color: isPresent ? const Color(0xFF10B981) : Colors.redAccent,
-                      size: 16,
+                      size: 15,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,33 +736,34 @@ class StudentDashboardScreen extends ConsumerWidget {
                           style: GoogleFonts.cairo(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: StudentTheme.textPrimary,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         if (groupName.isNotEmpty)
                           Text(
                             groupName,
-                            style: GoogleFonts.cairo(
-                              fontSize: 11,
-                              color: StudentTheme.textSecondary,
-                            ),
+                            style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey[600]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),
                   ),
                   if (assessment != null && assessment['score'] != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: branding.accentColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: branding.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'درجة: ${assessment['score']}/${assessment['maxScore'] ?? 10}',
+                        '${assessment['score']}/${assessment['maxScore'] ?? 10}',
                         style: GoogleFonts.cairo(
-                          fontSize: 11,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: branding.accentColor,
+                          color: branding.primaryColor,
                         ),
                       ),
                     ),

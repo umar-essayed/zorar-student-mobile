@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/providers/student_auth_provider.dart';
 import 'core/theme/branding_provider.dart';
 import 'core/theme/student_theme.dart';
 import 'features/auth/student_login_screen.dart';
 import 'features/navigation/student_shell_screen.dart';
+import 'features/onboarding/student_onboarding_screen.dart';
+
+// Provider to check if student has seen onboarding
+final onboardingStateProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('has_seen_onboarding') ?? false;
+});
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +32,7 @@ class StudentAppRoot extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final branding = ref.watch(brandingProvider);
     final auth = ref.watch(studentAuthProvider);
+    final onboardingAsync = ref.watch(onboardingStateProvider);
 
     return MaterialApp(
       title: branding.centerName.isNotEmpty ? branding.centerName : 'EduZorar Student',
@@ -39,16 +48,33 @@ class StudentAppRoot extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: auth.isLoading
-          ? Scaffold(
-              backgroundColor: StudentTheme.backgroundDark,
+      home: onboardingAsync.when(
+        loading: () => Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: branding.primaryColor),
+          ),
+        ),
+        error: (_, __) => auth.isAuthenticated
+            ? const StudentShellScreen()
+            : const StudentLoginScreen(),
+        data: (hasSeenOnboarding) {
+          if (!hasSeenOnboarding) {
+            return const StudentOnboardingScreen();
+          }
+
+          if (auth.isLoading) {
+            return Scaffold(
               body: Center(
-                child: CircularProgressIndicator(color: branding.accentColor),
+                child: CircularProgressIndicator(color: branding.primaryColor),
               ),
-            )
-          : auth.isAuthenticated
+            );
+          }
+
+          return auth.isAuthenticated
               ? const StudentShellScreen()
-              : const StudentLoginScreen(),
+              : const StudentLoginScreen();
+        },
+      ),
     );
   }
 }
