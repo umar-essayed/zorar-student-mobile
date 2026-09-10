@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/student_data_providers.dart';
 import '../../core/theme/branding_provider.dart';
-import '../../core/theme/student_theme.dart';
+import '../../core/utils/group_utils.dart';
 
 class StudentScheduleScreen extends ConsumerStatefulWidget {
   const StudentScheduleScreen({super.key});
@@ -235,7 +235,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                         Icon(LucideIcons.clock, size: 12, color: branding.primaryColor),
                                         const SizedBox(width: 4),
                                         Text(
-                                          startTime,
+                                          endTime.isNotEmpty ? '$startTime - $endTime' : startTime,
                                           style: GoogleFonts.cairo(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
@@ -286,65 +286,14 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-                                            fontWeight: FontWeight.bold,
-                                            color: branding.accentColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const Divider(color: StudentTheme.borderDark, height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(LucideIcons.user, size: 14, color: StudentTheme.textMuted),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      teacher.isNotEmpty ? 'أستاذ: $teacher' : 'المدرس المسؤول',
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 12,
-                                        color: StudentTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    const Icon(LucideIcons.mapPin, size: 14, color: Colors.orangeAccent),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      classroom,
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 12,
-                                        color: Colors.orangeAccent,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
                             if (teacherPhone.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: TextButton.icon(
                                   onPressed: () async {
-                                    final uri = Uri.parse('https://wa.me/2$teacherPhone');
+                                    final cleanPhone = teacherPhone.replaceAll(RegExp(r'\D'), '');
+                                    final uri = Uri.parse('https://wa.me/2$cleanPhone');
                                     if (await canLaunchUrl(uri)) {
                                       await launchUrl(uri, mode: LaunchMode.externalApplication);
                                     }
