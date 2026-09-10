@@ -1,0 +1,102 @@
+name: Build & Release EduZorar Student Mobile
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Signed Android Student Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter & Environment
+        run: flutter --version
+
+      - name: Configure Android Production Keystore
+        run: |
+          keytool -genkey -v -keystore android/app/zorar-release.jks \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias zorar -storepass zorarcode2026 -keypass zorarcode2026 \
+            -dname "CN=EduZorar Student Production, OU=Mobile, O=EduZorar Inc, L=Cairo, ST=Cairo, C=EG"
+          echo "storePassword=zorarcode2026" > android/key.properties
+          echo "keyPassword=zorarcode2026" >> android/key.properties
+          echo "keyAlias=zorar" >> android/key.properties
+          echo "storeFile=zorar-release.jks" >> android/key.properties
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Build Signed Release APK (Universal Production)
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Package & Generate Checksums
+        run: |
+          mkdir -p output_dist
+          cp build/app/outputs/flutter-apk/app-release.apk output_dist/zorar-student-release-signed.apk
+          cd output_dist
+          sha256sum * > SHA256SUMS.txt
+          echo "Generated Distribution Packages:"
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zorar-student-production-suite
+          path: output_dist/*
+          retention-days: 30
+
+      - name: Create GitHub Production Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: EduZorar Student Mobile v1.0.${{ github.run_number }}
+          body: |
+            ## 🎓 إصدار الإنتاج الرسمي لتطبيق طالب زُرار كود (EduZorar Student)
+            ### رقم الإصدار: v1.0.${{ github.run_number }}
+            
+            تم بناء الحزم رسمياً وتوقيعها رقمياً (Digitally Signed with RSA 2048-bit Keystore) للطلاب وأولياء الأمور:
+
+            ---
+            ### 📦 ملفات التثبيت المتاحة:
+            1. 📲 **`zorar-student-release-signed.apk`:**
+               - حزمة إنتاج رسمية موثقة وموقعة بالشهادة السحابية، محسنة بالكامل وخفيفة الحجم وجاهزة للتثبيت المباشر على جميع هواتف أندرويد.
+            2. 🛡️ **`SHA256SUMS.txt`:**
+               - البصمات الرقمية للتحقق من سلامة وصحة الملفات.
+
+            ---
+            ### ✨ أبرز ميزات تطبيق الطالب:
+            - 🆔 **بطاقة الطالب الرقمية الذكية (Digital Student ID & QR):** باركود ديناميكي عالي الدقة لإجراء الحضور التلقائي عند بوابات السنتر.
+            - ⏱️ **غرفة الامتحانات الإلكترونية المباشرة:** تايمر عد تنازلي، تسليم فوري وتصحيح ذكي وإظهار النتيجة فوراً.
+            - 📊 **سجل الحضور والغياب:** تتبع تفصيلي لكل الحصص وتواريخها وتنبيهات الغياب.
+            - 🏆 **سجل الكويزات والواجبات المدرسية:** رصد مستمر لمستوى الطالب وملاحظات المعلم.
+            - 💰 **محفظة الطالب والاشتراكات الشهرية:** مراجعة إيصالات السداد وحالة كل شهر دراسي ومستحقات السنتر.
+            - 🎥 **مكتبة المحاضرات والكورسات الرقمية:** مشاهدة الدروس والمحتوى التعليمي المنشور من المدرسين.
+            - 🎨 **هوية بصرية ديناميكية متغيرة:** يرتدي التطبيق ثيم وشعار وألوان واسم السنتر المسجل به الطالب تلقائياً مع دعم الوضع الليلي الكامل.
+          files: output_dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
