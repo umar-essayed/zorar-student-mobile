@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core/providers/student_auth_provider.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/services/security_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
@@ -26,6 +28,21 @@ class _StudentShellScreenState extends ConsumerState<StudentShellScreen> {
   void initState() {
     super.initState();
     SecurityService.requestNotificationPermission();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = ref.read(studentAuthProvider);
+      if (auth.isAuthenticated) {
+        final groupIds = auth.enrolledGroups
+            .map((g) => g['groupId']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toList();
+        PushNotificationService().syncStudentTopics(
+          tenantId: auth.tenantId,
+          studentId: auth.studentId,
+          groupIds: groupIds,
+        );
+      }
+    });
   }
 
   void _onSelectTab(int index) {

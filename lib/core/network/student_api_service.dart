@@ -219,6 +219,16 @@ class StudentApiService {
     }
   }
 
+  Future<bool> registerFcmToken(String token) async {
+    try {
+      await _dio.post('/notifications/fcm-token', data: {'token': token});
+      return true;
+    } catch (e) {
+      debugPrint('Error registerFcmToken: $e');
+      return false;
+    }
+  }
+
   Future<bool> markNotificationAsRead(String notificationId) async {
     try {
       await _dio.post('/notifications/$notificationId/read');

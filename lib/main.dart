@@ -10,6 +10,8 @@ import 'features/auth/student_login_screen.dart';
 import 'features/navigation/student_shell_screen.dart';
 import 'features/onboarding/student_onboarding_screen.dart';
 
+import 'core/services/push_notification_service.dart';
+
 // Provider to check if student has seen onboarding
 final onboardingStateProvider = FutureProvider<bool>((ref) async {
   final prefs = await SharedPreferences.getInstance();
@@ -18,6 +20,10 @@ final onboardingStateProvider = FutureProvider<bool>((ref) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase FCM Push Notifications
+  PushNotificationService().initialize();
+
   runApp(
     const ProviderScope(
       child: StudentAppRoot(),

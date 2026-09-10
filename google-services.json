@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "499158925356",
+    "project_id": "eduzorar",
+    "storage_bucket": "eduzorar.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:499158925356:android:d479d5e2fed1527ef45189",
+        "android_client_info": {
+          "package_name": "com.zorar.app.student_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvPHc9_btKYMRuduyifX_4VqOl1RBm8a4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:499158925356:android:d479d5e2fed1527ef45189",
+        "android_client_info": {
+          "package_name": "com.zorar.app.student__mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvPHc9_btKYMRuduyifX_4VqOl1RBm8a4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
