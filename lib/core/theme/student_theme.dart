@@ -69,7 +69,7 @@ class StudentTheme {
           elevation: 1,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColor,
         elevation: 0,
         shape: RoundedRectangleBorder(
