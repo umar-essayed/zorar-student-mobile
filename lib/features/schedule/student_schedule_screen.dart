@@ -45,24 +45,23 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   Widget build(BuildContext context) {
     final branding = ref.watch(brandingProvider);
     final groups = ref.watch(liveStudentGroupsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Filter groups for the selected day
+    // Filter groups for the selected day safely
     final dayGroups = groups.where((item) {
-      final g = (item['group'] is Map) ? (item['group'] as Map<String, dynamic>) : item;
+      final g = GroupUtils.extractGroup(item);
       final days = g['dayOfWeek'] as List?;
       if (days == null || days.isEmpty) return false;
-      return days.contains(_selectedDayIndex);
+      return days.any((d) => d.toString() == _selectedDayIndex.toString());
     }).toList();
 
     return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
+      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'جدول الحصص والمواعيد الأسبوعية',
           style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        backgroundColor: StudentTheme.surfaceCard,
-        elevation: 0,
         centerTitle: true,
       ),
       body: Column(
@@ -70,9 +69,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
           // Days of Week Horizontal Selector
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            color: StudentTheme.surfaceCard,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: SizedBox(
-              height: 48,
+              height: 44,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 scrollDirection: Axis.horizontal,
@@ -89,12 +88,14 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                       style: GoogleFonts.cairo(
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? Colors.black : StudentTheme.textPrimary,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : const Color(0xFF334155)),
                       ),
                     ),
                     selected: isSelected,
-                    selectedColor: branding.accentColor,
-                    backgroundColor: StudentTheme.surfaceLight,
+                    selectedColor: branding.primaryColor,
+                    backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF1F5F9),
                     onSelected: (selected) {
                       if (selected) {
                         setState(() {
@@ -102,11 +103,13 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                         });
                       }
                     },
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       side: BorderSide(
-                        color: isSelected ? branding.accentColor : StudentTheme.borderDark,
+                        color: isSelected
+                            ? branding.primaryColor
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
                     ),
                   );
@@ -122,14 +125,18 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(LucideIcons.calendarX, size: 54, color: StudentTheme.textMuted),
+                        Icon(
+                          LucideIcons.calendarX,
+                          size: 54,
+                          color: isDark ? Colors.grey[600] : Colors.grey[400],
+                        ),
                         const SizedBox(height: 14),
                         Text(
                           'لا توجد حصص مجدولة في هذا اليوم 🌴',
                           style: GoogleFonts.cairo(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: StudentTheme.textPrimary,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -137,7 +144,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                           'استغل اليوم في المذاكرة ومراجعة المحاضرات المسجلة',
                           style: GoogleFonts.cairo(
                             fontSize: 12,
-                            color: StudentTheme.textSecondary,
+                            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -150,21 +157,30 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = dayGroups[index];
-                      final g = (item['group'] is Map) ? (item['group'] as Map<String, dynamic>) : item;
-                      final gName = g['name']?.toString() ?? 'مجموعة دراسية';
-                      final subject = g['subject']?['name']?.toString() ?? 'مادة دراسية';
-                      final teacher = g['teacher']?['name']?.toString() ?? '';
+                      final g = GroupUtils.extractGroup(item);
+                      final gName = GroupUtils.getName(item);
+                      final subject = GroupUtils.getSubject(item, fallback: 'مادة دراسية');
+                      final teacher = GroupUtils.getTeacher(item);
                       final teacherPhone = g['teacher']?['phone']?.toString() ?? '';
-                      final classroom = g['classroom']?['name']?.toString() ?? 'القاعة الرئيسية';
+                      final classroom = GroupUtils.getClassroom(item);
                       final startTime = g['startTime']?.toString() ?? '';
                       final endTime = g['endTime']?.toString() ?? '';
 
                       return Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: StudentTheme.surfaceCard,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: StudentTheme.borderDark),
+                          border: Border.all(
+                            color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,10 +190,10 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: branding.accentColor.withValues(alpha: 0.15),
+                                    color: branding.primaryColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Icon(LucideIcons.bookOpen, color: branding.accentColor, size: 22),
+                                  child: Icon(LucideIcons.bookOpen, color: branding.primaryColor, size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -189,15 +205,19 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                         style: GoogleFonts.cairo(
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,
-                                          color: StudentTheme.textPrimary,
+                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
                                         gName,
                                         style: GoogleFonts.cairo(
                                           fontSize: 12,
-                                          color: StudentTheme.textSecondary,
+                                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
@@ -206,18 +226,76 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: StudentTheme.surfaceLight,
+                                      color: branding.primaryColor.withOpacity(0.08),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: branding.accentColor.withValues(alpha: 0.3)),
+                                      border: Border.all(color: branding.primaryColor.withOpacity(0.2)),
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(LucideIcons.clock, size: 12, color: branding.accentColor),
+                                        Icon(LucideIcons.clock, size: 12, color: branding.primaryColor),
                                         const SizedBox(width: 4),
                                         Text(
                                           startTime,
                                           style: GoogleFonts.cairo(
                                             fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: branding.primaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const Divider(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                if (teacher.isNotEmpty)
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(LucideIcons.userCheck, size: 14, color: isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            teacher,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 12,
+                                              color: isDark ? Colors.grey[300] : const Color(0xFF334155),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Row(
+                                  children: [
+                                    Icon(LucideIcons.mapPin, size: 14, color: isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      classroom,
+                                      style: GoogleFonts.cairo(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.grey[300] : const Color(0xFF334155),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
                                             fontWeight: FontWeight.bold,
                                             color: branding.accentColor,
                                           ),

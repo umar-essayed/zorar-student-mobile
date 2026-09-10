@@ -452,108 +452,130 @@ class StudentDashboardScreen extends ConsumerWidget {
     BrandingState branding,
     bool isDark,
   ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildActionButton(
-            icon: LucideIcons.fileText,
-            label: 'الامتحانات',
-            color: branding.primaryColor,
-            isDark: isDark,
-            onTap: () {
-              if (onNavigateTab != null) {
-                onNavigateTab(1);
-              } else {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentExamsScreen()));
-              }
-            },
-          ),
-          _buildActionButton(
-            icon: LucideIcons.video,
-            label: 'المحاضرات',
-            color: Colors.blueAccent,
-            isDark: isDark,
-            onTap: () {
-              if (onNavigateTab != null) onNavigateTab(2);
-            },
-          ),
-          _buildActionButton(
-            icon: LucideIcons.calendarDays,
-            label: 'جدول الحصص',
-            color: Colors.purpleAccent,
-            isDark: isDark,
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentScheduleScreen()));
-            },
-          ),
-          _buildActionButton(
-            icon: LucideIcons.award,
-            label: 'الدرجات',
-            color: Colors.amber[700]!,
-            isDark: isDark,
-            onTap: () {
-              if (onNavigateTab != null) onNavigateTab(3);
-            },
-          ),
-          _buildActionButton(
-            icon: LucideIcons.receipt,
-            label: 'الاشتراكات',
-            color: Colors.teal,
-            isDark: isDark,
-            onTap: () {
-              if (onNavigateTab != null) onNavigateTab(4);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: () {
-        SoundService.lightImpact();
-        onTap();
+    final actions = [
+      {
+        'icon': LucideIcons.fileText,
+        'label': 'الامتحانات',
+        'subtitle': 'أونلاين',
+        'color': branding.primaryColor,
+        'onTap': () {
+          if (onNavigateTab != null) {
+            onNavigateTab(1);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentExamsScreen()));
+          }
+        },
       },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
+      {
+        'icon': LucideIcons.video,
+        'label': 'المحاضرات',
+        'subtitle': 'الشروحات',
+        'color': const Color(0xFF2563EB),
+        'onTap': () {
+          if (onNavigateTab != null) onNavigateTab(2);
+        },
+      },
+      {
+        'icon': LucideIcons.calendarDays,
+        'label': 'جدول الحصص',
+        'subtitle': 'الأسبوعي',
+        'color': const Color(0xFF7C3AED),
+        'onTap': () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentScheduleScreen()));
+        },
+      },
+      {
+        'icon': LucideIcons.award,
+        'label': 'الدرجات',
+        'subtitle': 'التقييمات',
+        'color': const Color(0xFFD97706),
+        'onTap': () {
+          if (onNavigateTab != null) onNavigateTab(3);
+        },
+      },
+      {
+        'icon': LucideIcons.receipt,
+        'label': 'الاشتراكات',
+        'subtitle': 'والمحفظة',
+        'color': const Color(0xFF0D9488),
+        'onTap': () {
+          if (onNavigateTab != null) onNavigateTab(4);
+        },
+      },
+    ];
+
+    return SizedBox(
+      height: 98,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: actions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final act = actions[index];
+          final color = act['color'] as Color;
+
+          return InkWell(
+            onTap: () {
+              SoundService.lightImpact();
+              (act['onTap'] as VoidCallback)();
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: 86,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : const Color(0xFF334155),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(act['icon'] as IconData, color: color, size: 20),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    act['label'] as String,
+                    style: GoogleFonts.cairo(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    act['subtitle'] as String,
+                    style: GoogleFonts.cairo(
+                      fontSize: 9.5,
+                      color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

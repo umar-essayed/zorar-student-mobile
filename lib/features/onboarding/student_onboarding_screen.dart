@@ -22,21 +22,21 @@ class _StudentOnboardingScreenState extends ConsumerState<StudentOnboardingScree
 
   final List<Map<String, dynamic>> _slides = const [
     {
-      'title': 'كارت الحضور والباركود الذكي 🆔',
-      'subtitle': 'سجّل حضورك بلمح البصر عند بوابات السنتر والقاعات من خلال باركود الطالب الرقمي المعتمد.',
-      'icon': LucideIcons.scanLine,
-      'color': Color(0xFF0143A3),
-    },
-    {
       'title': 'امتحانات ومحاضرات في جيبك 🎓',
       'subtitle': 'خض الامتحانات الإلكترونية المباشرة واحصل على نتيجتك ونموذج الإجابة فوراً مع مشغل حصص محمي.',
       'icon': LucideIcons.fileCheck2,
+      'color': Color(0xFF0143A3),
+    },
+    {
+      'title': 'متابعة درجاتك وتقييماتك 📊',
+      'subtitle': 'رصد مستمر لكويزات الحصص وملاحظات المعلم وتقارير تفاعلية فورية لمتابعة تفوقك الدراسي.',
+      'icon': LucideIcons.lineChart,
       'color': Color(0xFF0D9488),
     },
     {
-      'title': 'متابعة درجاتك واشتراكاتك 📊',
-      'subtitle': 'اطّلع على تقييماتك بالحصة وملاحظات معلمك، وراجع إيصالات سدادك ومواعيد مجموعاتك بسهولة.',
-      'icon': LucideIcons.lineChart,
+      'title': 'جدول المواعيد والتنبيهات 🔔',
+      'subtitle': 'جدولك الأسبوعي الكامل ومواعيد القاعات مع إشعارات فورية بكل الحصص والملاحظات الهامة.',
+      'icon': LucideIcons.calendarClock,
       'color': Color(0xFF8B5CF6),
     },
   ];

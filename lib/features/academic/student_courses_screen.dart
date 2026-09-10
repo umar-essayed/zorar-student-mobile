@@ -282,25 +282,66 @@ class StudentCoursesScreen extends ConsumerWidget {
                             ),
                             children: lessons.map<Widget>((l) {
                               final lTitle = l['title']?.toString() ?? 'درس';
+                              final hasPdf = l['pdfAttachmentUrl'] != null &&
+                                  l['pdfAttachmentUrl'].toString().trim().isNotEmpty;
+                              final isFree = l['isFreePreview'] == true;
 
                               return ListTile(
                                 dense: true,
                                 leading: Container(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: branding.primaryColor.withOpacity(0.1),
+                                    color: (isFree || l['id'] != null)
+                                        ? branding.primaryColor.withOpacity(0.12)
+                                        : Colors.grey.withOpacity(0.15),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(LucideIcons.play, color: branding.primaryColor, size: 14),
-                                ),
-                                title: Text(
-                                  lTitle,
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 13,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  child: Icon(
+                                    (isFree || l['id'] != null) ? LucideIcons.play : LucideIcons.lock,
+                                    color: (isFree || l['id'] != null) ? branding.primaryColor : Colors.grey[600],
+                                    size: 14,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        lTitle,
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (hasPdf) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.redAccent.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(LucideIcons.fileText, size: 10, color: Colors.redAccent),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              'PDF',
+                                              style: GoogleFonts.cairo(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 subtitle: Text(
                                   'اضغط للمشاهدة في المشغل المحمي 🔒',

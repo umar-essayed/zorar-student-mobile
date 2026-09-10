@@ -12,7 +12,8 @@ import '../../core/theme/student_theme.dart';
 import '../../core/utils/group_utils.dart';
 
 class StudentAttendanceGradesScreen extends ConsumerStatefulWidget {
-  const StudentAttendanceGradesScreen({super.key});
+  final int initialTabIndex;
+  const StudentAttendanceGradesScreen({super.key, this.initialTabIndex = 0});
 
   @override
   ConsumerState<StudentAttendanceGradesScreen> createState() =>
@@ -28,7 +29,11 @@ class _StudentAttendanceGradesScreenState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 1),
+    );
   }
 
   @override
@@ -123,6 +128,7 @@ class _StudentAttendanceGradesScreenState
         data: (profile) {
           final allAttendances = (profile?['attendances'] as List?) ?? [];
           final allAssessments = (profile?['assessments'] as List?) ?? [];
+          final allExamSubmissions = (profile?['examSubmissions'] as List?) ?? [];
 
           final attendances = _selectedGroupId == null
               ? allAttendances
@@ -194,7 +200,7 @@ class _StudentAttendanceGradesScreenState
                   controller: _tabController,
                   children: [
                     _buildAttendanceTab(attendances, branding, isDark),
-                    _buildGradesTab(assessments, attendances, branding, isDark),
+                    _buildGradesTab(assessments, attendances, allExamSubmissions, branding, isDark),
                   ],
                 ),
               ),
@@ -364,16 +370,26 @@ class _StudentAttendanceGradesScreenState
   Widget _buildGradesTab(
     List<dynamic> assessments,
     List<dynamic> attendances,
+    List<dynamic> examSubmissions,
     BrandingState branding,
     bool isDark,
   ) {
     final combinedAssessments = <Map<String, dynamic>>[];
+
+    // 1. Session Assessments
     for (final a in assessments) {
-      if (a is Map<String, dynamic>) combinedAssessments.add(a);
+      if (a is Map<String, dynamic>) {
+        final item = Map<String, dynamic>.from(a);
+        item['type'] = 'ASSESSMENT';
+        combinedAssessments.add(item);
+      }
     }
+
+    // 2. Attendance-linked assessments
     for (final att in attendances) {
       if (att is Map<String, dynamic> && att['assessment'] != null) {
         final a = Map<String, dynamic>.from(att['assessment']);
+        a['type'] = 'QUIZ';
         a['sessionTitle'] = att['session']?['title'];
         a['sessionNumber'] = att['session']?['sessionNumber'];
         a['groupName'] = GroupUtils.getName(att['group'] ?? att);
@@ -383,16 +399,44 @@ class _StudentAttendanceGradesScreenState
       }
     }
 
+    // 3. Online Exam Submissions
+    for (final es in examSubmissions) {
+      if (es is Map<String, dynamic>) {
+        final exam = es['exam'] as Map<String, dynamic>?;
+        combinedAssessments.add({
+          'id': es['id'],
+          'type': 'EXAM',
+          'sessionTitle': exam?['title']?.toString() ?? 'امتحان إلكتروني شامل',
+          'score': es['score'],
+          'maxScore': es['total'] ?? exam?['totalScore'] ?? 100,
+          'groupName': 'امتحان أونلاين',
+          'homeworkDone': true,
+          'date': es['submittedAt']?.toString() ?? '',
+          'notes': es['score'] != null ? 'تم التصحيح التلقائي ورصد الدرجة' : '',
+        });
+      }
+    }
+
     if (combinedAssessments.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.award, color: Colors.grey[400], size: 48),
-            const SizedBox(height: 10),
+            Icon(LucideIcons.award, color: Colors.grey[400], size: 54),
+            const SizedBox(height: 12),
             Text(
               'لم يتم رصد درجات أو كويزات بعد',
-              style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 13),
+              style: GoogleFonts.cairo(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'ستظهر هنا درجات الكويزات الدورية ونتائج الامتحانات الشاملة فور رصدها',
+              style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 12),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -403,23 +447,37 @@ class _StudentAttendanceGradesScreenState
       padding: const EdgeInsets.all(16),
       physics: const BouncingScrollPhysics(),
       itemCount: combinedAssessments.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = combinedAssessments[index];
-        final score = item['score'] ?? item['quizScore'] ?? 0;
-        final maxScore = item['maxScore'] ?? 10;
+        final type = item['type']?.toString() ?? 'QUIZ';
+
+        // Safe numeric parsing for score & maxScore
+        final rawScore = item['score'] ?? item['quizScore'] ?? 0;
+        final rawMax = item['maxScore'] ?? item['total'] ?? 10;
+        final score = (num.tryParse(rawScore.toString()) ?? 0).toDouble();
+        final maxScore = (num.tryParse(rawMax.toString()) ?? 10).toDouble();
+
         final homeworkDone = item['homeworkDone'] ?? item['isHomeworkDone'] ?? false;
         final notes = item['notes']?.toString() ?? '';
         final title = item['sessionTitle']?.toString() ??
             (item['sessionNumber'] != null ? 'كويز حصة ${item['sessionNumber']}' : 'تقييم دراسي');
-        final group = GroupUtils.getName(item['groupName'] ?? item['group'] ?? item);
+        final group = (item['groupName'] is String && item['groupName'].toString().isNotEmpty)
+            ? item['groupName'].toString()
+            : GroupUtils.getName(item['group'] ?? item);
 
-        final ratio = maxScore > 0 ? (score / maxScore) : 0.0;
-        final scoreColor = ratio >= 0.85
+        final ratio = (maxScore > 0 && !maxScore.isNaN) ? (score / maxScore) : 0.0;
+        final safeRatio = ratio.isFinite ? ratio.clamp(0.0, 1.0) : 0.0;
+
+        final scoreColor = safeRatio >= 0.85
             ? const Color(0xFF10B981)
-            : ratio >= 0.60
+            : safeRatio >= 0.60
                 ? Colors.amber[700]!
                 : Colors.redAccent;
+
+        final typeLabel = type == 'EXAM'
+            ? 'امتحان إلكتروني'
+            : (type == 'QUIZ' ? 'كويز الحصة' : 'تقييم أداء');
 
         return Container(
           padding: const EdgeInsets.all(14),
@@ -429,6 +487,13 @@ class _StudentAttendanceGradesScreenState
             border: Border.all(
               color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,17 +505,40 @@ class _StudentAttendanceGradesScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          style: GoogleFonts.cairo(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: branding.primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                typeLabel,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: branding.primaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        if (group.isNotEmpty)
+                        if (group.isNotEmpty) ...[
+                          const SizedBox(height: 2),
                           Text(
                             group,
                             style: GoogleFonts.cairo(
@@ -460,6 +548,7 @@ class _StudentAttendanceGradesScreenState
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -471,7 +560,7 @@ class _StudentAttendanceGradesScreenState
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '$score / $maxScore',
+                      '${score.toStringAsFixed(score.truncateToDouble() == score ? 0 : 1)} / ${maxScore.toStringAsFixed(maxScore.truncateToDouble() == maxScore ? 0 : 1)}',
                       style: GoogleFonts.cairo(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
@@ -485,7 +574,7 @@ class _StudentAttendanceGradesScreenState
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: ratio.clamp(0.0, 1.0),
+                  value: safeRatio,
                   minHeight: 5,
                   backgroundColor: isDark ? const Color(0xFF131C31) : const Color(0xFFF1F5F9),
                   valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
@@ -526,11 +615,10 @@ class _StudentAttendanceGradesScreenState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'ملاحظة: $notes',
+                        notes,
                         style: GoogleFonts.cairo(
                           fontSize: 11,
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -545,6 +633,7 @@ class _StudentAttendanceGradesScreenState
       },
     );
   }
+
 
   Widget _buildMetricBadge(String label, String value, Color color, bool isDark) {
     return Column(

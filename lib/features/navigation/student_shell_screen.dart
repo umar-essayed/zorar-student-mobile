@@ -30,6 +30,7 @@ class _StudentShellScreenState extends ConsumerState<StudentShellScreen> {
   @override
   Widget build(BuildContext context) {
     final branding = ref.watch(brandingProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final screens = [
       StudentDashboardScreen(onNavigateTab: _onSelectTab),
@@ -39,67 +40,117 @@ class _StudentShellScreenState extends ConsumerState<StudentShellScreen> {
       const StudentLedgerScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: StudentTheme.backgroundDark,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: StudentTheme.surfaceCard,
-          border: const Border(top: BorderSide(color: StudentTheme.borderDark, width: 1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: screens,
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onSelectTab,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: branding.accentColor,
-          unselectedItemColor: StudentTheme.textMuted,
-          selectedLabelStyle: GoogleFonts.cairo(
-            fontWeight: FontWeight.bold,
-            fontSize: 11,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(
+              top: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
-          unselectedLabelStyle: GoogleFonts.cairo(
-            fontWeight: FontWeight.w500,
-            fontSize: 10,
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: _onSelectTab,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: branding.primaryColor,
+            unselectedItemColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            selectedLabelStyle: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+            unselectedLabelStyle: GoogleFonts.cairo(
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+            items: [
+              BottomNavigationBarItem(
+                icon: const Icon(LucideIcons.home, size: 20),
+                activeIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(LucideIcons.home, size: 20, color: branding.primaryColor),
+                ),
+                label: 'الرئيسية',
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(LucideIcons.fileQuestion, size: 20),
+                activeIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(LucideIcons.fileQuestion, size: 20, color: branding.primaryColor),
+                ),
+                label: 'الامتحانات',
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(LucideIcons.video, size: 20),
+                activeIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(LucideIcons.video, size: 20, color: branding.primaryColor),
+                ),
+                label: 'المحاضرات',
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(LucideIcons.calendarCheck, size: 20),
+                activeIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(LucideIcons.calendarCheck, size: 20, color: branding.primaryColor),
+                ),
+                label: 'الحضور والدرجات',
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(LucideIcons.receipt, size: 20),
+                activeIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(LucideIcons.receipt, size: 20, color: branding.primaryColor),
+                ),
+                label: 'الاشتراكات',
+              ),
+            ],
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.home, size: 20),
-              activeIcon: Icon(LucideIcons.home, size: 22),
-              label: 'الرئيسية',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.fileQuestion, size: 20),
-              activeIcon: Icon(LucideIcons.fileQuestion, size: 22),
-              label: 'الامتحانات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.video, size: 20),
-              activeIcon: Icon(LucideIcons.video, size: 22),
-              label: 'المحاضرات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.calendarCheck, size: 20),
-              activeIcon: Icon(LucideIcons.calendarCheck, size: 22),
-              label: 'الحضور والدرجات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.receipt, size: 20),
-              activeIcon: Icon(LucideIcons.receipt, size: 22),
-              label: 'الاشتراكات',
-            ),
-          ],
         ),
       ),
     );

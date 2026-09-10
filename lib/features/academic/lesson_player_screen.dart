@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/student_api_service.dart';
 import '../../core/providers/student_auth_provider.dart';
+import '../../core/services/security_service.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
 import '../../core/theme/student_theme.dart';
@@ -35,10 +36,13 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
   bool _isLoadingToken = false;
   String? _resolvedVideoUrl;
   String? _youtubeId;
+  String? _pdfAttachmentUrl;
+  String? _lockMessage;
 
   @override
   void initState() {
     super.initState();
+    SecurityService.enableSecureScreen();
     _initVideo();
 
     // Dynamic anti-piracy floating watermark shifts every 5 seconds
@@ -52,11 +56,22 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _watermarkTimer?.cancel();
+    SecurityService.disableSecureScreen();
+    super.dispose();
+  }
+
   void _initVideo() {
     final directUrl = widget.lesson['videoUrl']?.toString() ??
         widget.lesson['url']?.toString() ??
         widget.lesson['encryptedVideoId']?.toString() ??
         '';
+
+    _pdfAttachmentUrl = widget.lesson['pdfAttachmentUrl']?.toString() ??
+        widget.lesson['attachmentUrl']?.toString() ??
+        widget.lesson['fileUrl']?.toString();
 
     _youtubeId = _extractYouTubeId(directUrl);
     _resolvedVideoUrl = directUrl;
@@ -74,14 +89,25 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
       final data = await StudentApiService().getLessonPlayerToken(lessonId);
       if (data != null && mounted) {
         final rawId = data['rawVideoId']?.toString();
-        if (rawId != null && rawId.isNotEmpty) {
-          setState(() {
+        final pdf = data['pdfAttachmentUrl']?.toString();
+        setState(() {
+          if (rawId != null && rawId.isNotEmpty) {
             _resolvedVideoUrl = rawId;
             _youtubeId = _extractYouTubeId(rawId) ?? _youtubeId;
-          });
-        }
+          }
+          if (pdf != null && pdf.isNotEmpty) {
+            _pdfAttachmentUrl = pdf;
+          }
+          _lockMessage = null;
+        });
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _lockMessage = 'هذه المحاضرة مغلقة أو تتطلب اشتراكاً سارياً بالسنتر';
+        });
+      }
+    }
     if (mounted) setState(() => _isLoadingToken = false);
   }
 
@@ -115,7 +141,10 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     if (targetUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('لم يتم إرفاق رابط فيديو لهذه الحصة بعد', style: GoogleFonts.cairo()),
+          content: Text(
+            _lockMessage ?? 'المحاضرة قيد التجهيز ولم يتم إتاحة الفيديو بعد',
+            style: GoogleFonts.cairo(),
+          ),
           backgroundColor: Colors.orange[800],
         ),
       );
@@ -138,16 +167,10 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تعذر تشغيل الفيديو: $e', style: GoogleFonts.cairo()),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: Colors.red,
         ),
       );
     }
-  }
-
-  @override
-  void dispose() {
-    _watermarkTimer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -158,11 +181,15 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
 
     final title = widget.lesson['title']?.toString() ?? 'المحاضرة الرقمية';
     final desc = widget.lesson['description']?.toString() ?? '';
-    final pdfUrl = widget.lesson['pdfAttachmentUrl']?.toString() ??
+    final pdfUrl = _pdfAttachmentUrl ??
+        widget.lesson['pdfAttachmentUrl']?.toString() ??
         widget.lesson['attachmentUrl']?.toString() ??
         '';
     final attachments = (widget.lesson['attachments'] as List?) ?? [];
     final quiz = widget.lesson['quiz'] as Map<String, dynamic>?;
+
+    final isVideoAvailable = (_youtubeId != null && _youtubeId!.isNotEmpty) ||
+        (_resolvedVideoUrl != null && _resolvedVideoUrl!.isNotEmpty);
 
     final thumbnailUrl = _youtubeId != null
         ? 'https://img.youtube.com/vi/$_youtubeId/hqdefault.jpg'
@@ -183,7 +210,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Interactive Video Player Container with Real Thumbnail
+            // 1. Interactive Video Player Container with Real Thumbnail & Security
             Container(
               height: 230,
               width: double.infinity,
@@ -220,7 +247,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                     ),
                   ),
 
-                  // Play Button Center
+                  // Play or Lock Center Button
                   Center(
                     child: InkWell(
                       onTap: _playVideo,
@@ -228,26 +255,27 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: branding.primaryColor,
+                          color: isVideoAvailable ? branding.primaryColor : Colors.black87,
                           shape: BoxShape.circle,
+                          border: isVideoAvailable ? null : Border.all(color: Colors.amber, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: branding.primaryColor.withOpacity(0.5),
+                              color: (isVideoAvailable ? branding.primaryColor : Colors.black).withOpacity(0.5),
                               blurRadius: 20,
                               offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          LucideIcons.play,
-                          color: Colors.white,
+                        child: Icon(
+                          isVideoAvailable ? LucideIcons.play : LucideIcons.lock,
+                          color: isVideoAvailable ? Colors.white : Colors.amber,
                           size: 32,
                         ),
                       ),
                     ),
                   ),
 
-                  // Bottom Play Hint
+                  // Bottom Play / Lock Hint
                   Positioned(
                     bottom: 12,
                     left: 16,
@@ -258,16 +286,22 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
+                            color: Colors.black.withOpacity(0.75),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(LucideIcons.shieldCheck, color: Color(0xFF10B981), size: 14),
+                              Icon(
+                                isVideoAvailable ? LucideIcons.shieldCheck : LucideIcons.lock,
+                                color: isVideoAvailable ? const Color(0xFF10B981) : Colors.amber,
+                                size: 14,
+                              ),
                               const SizedBox(width: 6),
                               Text(
-                                'اضغط للتشغيل • مشغل مؤمّن بحقوق الطالب 🔒',
+                                isVideoAvailable
+                                    ? 'اضغط للتشغيل • مشغل مؤمّن بحقوق الطالب 🔒'
+                                    : (_lockMessage ?? 'المحاضرة قيد التجهيز أو مغلقة 🔒'),
                                 style: GoogleFonts.cairo(
                                   color: Colors.white,
                                   fontSize: 11,
@@ -295,8 +329,8 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                       child: Text(
                         '${auth.studentName} • ${auth.studentCode}',
                         style: GoogleFonts.cairo(
-                          fontSize: 10,
-                          color: Colors.white.withOpacity(0.55),
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -306,24 +340,60 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
               ),
             ),
 
-            // 2. Lesson Title & Course Info
+            // Primary Play / Status Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isVideoAvailable ? branding.primaryColor : (isDark ? const Color(0xFF334155) : const Color(0xFF94A3B8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: Icon(
+                    isVideoAvailable ? LucideIcons.playCircle : LucideIcons.lock,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  label: Text(
+                    isVideoAvailable ? 'مشاهدة المحاضرة الآن 🎥' : 'المحاضرة مغلقة أو قيد الرفع 🔒',
+                    style: GoogleFonts.cairo(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  onPressed: isVideoAvailable
+                      ? _playVideo
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                _lockMessage ?? 'هذه المحاضرة قيد التجهيز ولم يتم إتاحتها بعد',
+                                style: GoogleFonts.cairo(),
+                              ),
+                              backgroundColor: Colors.orange[800],
+                            ),
+                          );
+                        },
+                ),
+              ),
+            ),
+
+            // 2. Course & Lesson Details
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (widget.courseTitle.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: branding.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
                       child: Text(
                         widget.courseTitle,
                         style: GoogleFonts.cairo(
-                          fontSize: 11,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.bold,
                           color: branding.primaryColor,
                         ),
@@ -426,14 +496,20 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
             // 4. PDF Attachment / Worksheets
             if (pdfUrl.isNotEmpty || attachments.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(
-                  'المرفقات وأوراق العمل 📑',
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.fileText, size: 18, color: branding.primaryColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'المرفقات ومذكرات الشرح 📑',
+                      style: GoogleFonts.cairo(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -441,21 +517,33 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                   child: Card(
+                    elevation: 0,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.black.withOpacity(0.06),
+                      ),
+                    ),
                     child: ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.redAccent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(LucideIcons.fileText, color: Colors.red, size: 20),
+                        child: const Icon(LucideIcons.fileText, color: Colors.redAccent, size: 20),
                       ),
                       title: Text(
-                        'مذكرة الشرح والواجب (PDF)',
+                        'مذكرة الحصة الشاملة (PDF)',
                         style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
+                      subtitle: Text(
+                        'اضغط للتحميل والمطالعة',
+                        style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey),
+                      ),
                       trailing: IconButton(
-                        icon: const Icon(LucideIcons.download, size: 18),
+                        icon: const Icon(LucideIcons.download, size: 20, color: Colors.redAccent),
                         onPressed: () async {
                           final uri = Uri.tryParse(pdfUrl);
                           if (uri != null && await canLaunchUrl(uri)) {

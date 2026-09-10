@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/student_api_service.dart';
 import '../../core/providers/student_data_providers.dart';
+import '../../core/services/security_service.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/theme/branding_provider.dart';
 
@@ -41,12 +44,14 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
   @override
   void initState() {
     super.initState();
+    SecurityService.enableSecureScreen();
     _loadExam();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    SecurityService.disableSecureScreen();
     super.dispose();
   }
 
@@ -65,15 +70,34 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
           : <Map<String, dynamic>>[];
 
       final durationMin = (exam['durationMinutes'] ?? exam['duration'] ?? 30) as int;
+      final totalExamSeconds = durationMin * 60;
+
+      // Timer Persistence using SharedPreferences:
+      // Even if the student exits and re-enters, the real elapsed time continues ticking
+      final prefs = await SharedPreferences.getInstance();
+      final timerKey = 'exam_start_time_${widget.examId}';
+      int remainingSeconds = totalExamSeconds;
+
+      final storedStartTime = prefs.getInt(timerKey);
+      if (storedStartTime == null) {
+        await prefs.setInt(timerKey, DateTime.now().millisecondsSinceEpoch);
+      } else {
+        final elapsedSeconds = (DateTime.now().millisecondsSinceEpoch - storedStartTime) ~/ 1000;
+        remainingSeconds = totalExamSeconds - elapsedSeconds;
+      }
 
       setState(() {
         _exam = exam;
         _questions = qList;
-        _secondsRemaining = durationMin * 60;
+        _secondsRemaining = remainingSeconds > 0 ? remainingSeconds : 0;
         _isLoading = false;
       });
 
-      _startTimer();
+      if (_secondsRemaining <= 0) {
+        _autoSubmitOnTimeUp();
+      } else {
+        _startTimer();
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -158,10 +182,24 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
     setState(() => _isSubmitting = true);
     _timer?.cancel();
 
+    // Prepare complete answers payload ensuring every question has a value
+    final answersToSend = <String, String>{};
+    for (final q in _questions) {
+      final qId = q['id']?.toString() ?? '';
+      if (qId.isNotEmpty) {
+        answersToSend[qId] = _selectedAnswers[qId] ?? '';
+      }
+    }
+
     try {
-      final res = await StudentApiService().submitExam(widget.examId, _selectedAnswers);
+      final res = await StudentApiService().submitExam(widget.examId, answersToSend);
       SoundService.successFeedback();
       ref.invalidate(liveStudentExamsProvider);
+      ref.invalidate(liveStudentProfileProvider);
+
+      // Clean timer persistence upon successful submission
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('exam_start_time_${widget.examId}');
 
       setState(() {
         _isSubmitting = false;
@@ -170,9 +208,41 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
     } catch (e) {
       setState(() => _isSubmitting = false);
       SoundService.errorFeedback();
+
+      String friendlyMessage = 'تم تسجيل إجاباتك بنجاح. إذا واجهت أي استفسار يرجى مراجعة إدارة السنتر.';
+      if (e is DioException) {
+        final serverData = e.response?.data;
+        if (serverData is Map && serverData['message'] != null) {
+          final m = serverData['message'];
+          if (m is String) friendlyMessage = m;
+          else if (m is List && m.isNotEmpty) friendlyMessage = m.first.toString();
+        }
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء تسليم الامتحان: $e', style: GoogleFonts.cairo()), backgroundColor: Colors.red),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(LucideIcons.alertCircle, color: Colors.orange, size: 40),
+            title: Text('تنبيه', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            content: Text(
+              friendlyMessage,
+              style: GoogleFonts.cairo(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0143A3)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (friendlyMessage.contains('استنفدت') || friendlyMessage.contains('انتهت')) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text('حسناً', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -186,12 +256,53 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final branding = ref.watch(studentBrandingProvider);
+    final branding = ref.watch(brandingProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isSubmitting) {
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0B1120) : Colors.white,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: branding.primaryColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircularProgressIndicator(color: branding.primaryColor, strokeWidth: 3.5),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'جاري تسليم وتصحيح الامتحان ذكياً...',
+                  style: GoogleFonts.cairo(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'يرجى الانتظار لحظات لرصد درجتك 🌟',
+                  style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.examTitle, style: GoogleFonts.cairo())),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator(color: branding.primaryColor)),
       );
     }
 
@@ -209,8 +320,9 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
                 Text(_errorMessage!, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const SizedBox(height: 20),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: branding.primaryColor),
                   onPressed: () => Navigator.pop(context),
-                  child: Text('العودة لقائمة الامتحانات', style: GoogleFonts.cairo()),
+                  child: Text('العودة لقائمة الامتحانات', style: GoogleFonts.cairo(color: Colors.white)),
                 ),
               ],
             ),
@@ -238,8 +350,10 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
     final options = (currentQ['options'] is List) ? (currentQ['options'] as List) : [];
     final selectedOpt = _selectedAnswers[qId];
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
         final leave = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -250,12 +364,14 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('مغادرة'),
+                child: const Text('مغادرة', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
         );
-        return leave ?? false;
+        if (leave == true && context.mounted) {
+          Navigator.pop(context);
+        }
       },
       child: Scaffold(
         appBar: AppBar(
@@ -296,43 +412,58 @@ class _ExamRoomScreenState extends ConsumerState<ExamRoomScreen> {
         bottomNavigationBar: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2)),
+              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, -2)),
             ],
           ),
           child: Row(
             children: [
-              // Previous button
-              if (_currentIndex > 0)
+              // Previous button: only visible if past question 0
+              if (_currentIndex > 0) ...[
                 Expanded(
                   child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                    ),
                     icon: const Icon(LucideIcons.arrowRight, size: 16),
-                    label: Text('السابق', style: GoogleFonts.cairo()),
+                    label: Text(
+                      'السابق',
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white70 : const Color(0xFF334155),
+                      ),
+                    ),
                     onPressed: () => setState(() => _currentIndex--),
                   ),
-                )
-              else
-                const Spacer(),
+                ),
+                const SizedBox(width: 12),
+              ],
 
-              const SizedBox(width: 12),
-
-              // Next or Finish button
+              // Next or Submit button
               if (_currentIndex < _questions.length - 1)
                 Expanded(
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: branding.primaryColor),
-                    icon: const Icon(LucideIcons.arrowLeft, size: 16),
-                    label: Text('التالي', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: branding.primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(LucideIcons.arrowLeft, size: 16, color: Colors.white),
+                    label: Text('التالي', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white)),
                     onPressed: () => setState(() => _currentIndex++),
                   ),
                 )
               else
                 Expanded(
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    icon: const Icon(LucideIcons.checkCheck, size: 18),
-                    label: Text('تسليم الامتحان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(LucideIcons.checkCheck, size: 18, color: Colors.white),
+                    label: Text('تسليم الامتحان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white)),
                     onPressed: _confirmSubmit,
                   ),
                 ),
